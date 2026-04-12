@@ -9,13 +9,9 @@ import { Card } from '../ui/Card'
 
 export function WorkoutView() {
   const {
-    phase,
-    session,
-    currentBlockIndex,
-    currentExerciseIndex,
-    currentSetIndex,
-    setLogs,
-    reset,
+    phase, session,
+    currentBlockIndex, currentExerciseIndex, currentSetIndex,
+    setLogs, reset,
   } = useWorkoutStore()
 
   const [showAbandon, setShowAbandon] = useState(false)
@@ -26,7 +22,6 @@ export function WorkoutView() {
 
   const block = session.blocks[currentBlockIndex]
 
-  // Progress
   const totalSets = session.blocks.flatMap((b) =>
     b.exercises.flatMap((e) => e.sets.filter((s) => s.type !== 'warmup'))
   ).length
@@ -35,59 +30,60 @@ export function WorkoutView() {
   ).length
   const progress = totalSets > 0 ? doneSets / totalSets : 0
 
+  const allDoneInBlock = block?.exercises.every((e) =>
+    e.sets.every((s) => setLogs[e.id]?.[s.set_number]?.completed || setLogs[e.id]?.[s.set_number]?.notes === 'skipped')
+  )
+  const hasNextBlock = currentBlockIndex < session.blocks.length - 1
+
   return (
     <div className="flex flex-col h-full">
-      {/* Header */}
-      <div className="px-4 pt-4 pb-3 border-b border-zinc-800">
+      {/* ─── Header ─── */}
+      <div className="px-4 pt-4 pb-3 border-b border-edge">
         <div className="flex items-center justify-between mb-3">
           <div>
-            <h1 className="text-base font-semibold text-white">{session.name}</h1>
-            <p className="text-xs text-zinc-500">
+            <h1 className="text-base font-condensed font-bold text-white tracking-wide">{session.name}</h1>
+            <p className="text-xs text-muted font-condensed">
               Bloc {currentBlockIndex + 1}/{session.blocks.length} · {doneSets}/{totalSets} sets
             </p>
           </div>
           <button
             onClick={() => setShowAbandon(true)}
-            className="text-zinc-500 hover:text-zinc-300 transition-colors"
+            className="w-8 h-8 rounded-full bg-surface-2 border border-edge flex items-center justify-center text-faint hover:text-white transition-colors"
           >
-            <X size={20} />
+            <X size={15} />
           </button>
         </div>
         {/* Progress bar */}
-        <div className="h-1.5 bg-zinc-800 rounded-full overflow-hidden">
+        <div className="h-1 bg-edge rounded-full overflow-hidden">
           <div
-            className="h-full bg-orange-500 rounded-full transition-all duration-500"
+            className="h-full bg-lime rounded-full transition-all duration-700"
             style={{ width: `${progress * 100}%` }}
           />
         </div>
       </div>
 
-      {/* Block title */}
-      <div className="px-4 py-3 border-b border-zinc-800/50">
-        <div className="flex items-center gap-2">
-          <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${
-            block?.type === 'superset'
-              ? 'bg-purple-900/50 text-purple-300'
-              : 'bg-zinc-800 text-zinc-400'
-          }`}>
-            {block?.type === 'superset' ? 'Superset' : 'Strength'}
-          </span>
-          <span className="text-sm font-medium text-zinc-300">{block?.name}</span>
-        </div>
+      {/* ─── Block badge ─── */}
+      <div className="px-4 py-2.5 border-b border-edge/50 flex items-center gap-2">
+        <span className={`text-[10px] px-2 py-0.5 rounded-full font-condensed font-semibold tracking-wide flex-shrink-0 ${
+          block?.type === 'superset' ? 'bg-purple-900/30 text-purple-400' : 'bg-surface-2 text-muted'
+        }`}>
+          {block?.type === 'superset' ? 'Superset' : 'Strength'}
+        </span>
+        <span className="text-sm font-condensed font-semibold text-[#EEEEFF]">{block?.name}</span>
         {block?.notes && (
-          <p className="text-xs text-zinc-500 mt-1">{block.notes}</p>
+          <span className="text-xs text-faint truncate flex-1 text-right">{block.notes}</span>
         )}
       </div>
 
-      {/* Exercises */}
-      <div className="flex-1 overflow-y-auto px-4 py-4 space-y-6 pb-24">
+      {/* ─── Exercise list ─── */}
+      <div className="flex-1 overflow-y-auto px-4 py-4 space-y-6 pb-28">
         {block?.exercises.map((exercise, exerciseIndex) => (
           <div key={exercise.id}>
             {block.type === 'superset' && exerciseIndex > 0 && (
-              <div className="flex items-center gap-2 my-3">
-                <div className="flex-1 h-px bg-purple-800/30" />
-                <span className="text-xs text-purple-400 font-medium">↕ Superset</span>
-                <div className="flex-1 h-px bg-purple-800/30" />
+              <div className="flex items-center gap-2 my-4">
+                <div className="flex-1 h-px bg-purple-800/20" />
+                <span className="text-[10px] font-condensed tracking-wider text-purple-500 uppercase">Superset</span>
+                <div className="flex-1 h-px bg-purple-800/20" />
               </div>
             )}
             <ExerciseCard
@@ -99,23 +95,19 @@ export function WorkoutView() {
           </div>
         ))}
 
-        {/* Warmup / cooldown notes */}
         {currentBlockIndex === 0 && session.warmup && (
           <Card className="p-3">
-            <p className="text-xs text-zinc-500 uppercase tracking-wider mb-1">Échauffement</p>
-            <p className="text-sm text-zinc-300">{session.warmup.instructions}</p>
+            <p className="text-[10px] font-condensed tracking-widest uppercase text-lime mb-1">Échauffement</p>
+            <p className="text-sm text-[#EEEEFF]">{session.warmup.instructions}</p>
           </Card>
         )}
       </div>
 
-      {/* Next block button */}
-      {block && block.exercises.every((e) =>
-        e.sets.every((s) => setLogs[e.id]?.[s.set_number]?.completed || setLogs[e.id]?.[s.set_number]?.notes === 'skipped')
-      ) && currentBlockIndex < session.blocks.length - 1 && (
-        <div className="fixed bottom-20 left-0 right-0 px-4">
-          <Button
-            fullWidth
-            size="lg"
+      {/* ─── Next block button ─── */}
+      {allDoneInBlock && hasNextBlock && (
+        <div className="fixed bottom-20 left-0 right-0 max-w-lg mx-auto px-4">
+          <button
+            className="w-full flex items-center justify-center gap-2 py-4 rounded-2xl bg-lime text-[#08080F] font-condensed font-bold text-base tracking-wide transition-all active:scale-[0.98]"
             onClick={() => useWorkoutStore.setState({
               currentBlockIndex: currentBlockIndex + 1,
               currentExerciseIndex: 0,
@@ -124,21 +116,21 @@ export function WorkoutView() {
           >
             Bloc suivant
             <ChevronRight size={18} />
-          </Button>
+          </button>
         </div>
       )}
 
-      {/* Abandon confirm */}
+      {/* ─── Abandon confirm ─── */}
       {showAbandon && (
-        <div className="fixed inset-0 bg-black/80 flex items-end justify-center z-50 p-4">
-          <Card className="w-full p-5 space-y-4">
-            <h3 className="text-base font-semibold">Abandonner la séance ?</h3>
-            <p className="text-sm text-zinc-400">La progression sera perdue.</p>
+        <div className="fixed inset-0 bg-black/70 flex items-end justify-center z-50 p-4">
+          <Card className="w-full p-5 space-y-4 max-w-lg animate-slide-up">
+            <h3 className="text-base font-condensed font-bold text-white tracking-wide">Abandonner la séance ?</h3>
+            <p className="text-sm text-muted">La progression sera perdue.</p>
             <div className="flex gap-3">
               <Button variant="secondary" fullWidth onClick={() => setShowAbandon(false)}>
                 Continuer
               </Button>
-              <Button variant="danger" fullWidth onClick={() => { reset(); }}>
+              <Button variant="danger" fullWidth onClick={() => { reset() }}>
                 Abandonner
               </Button>
             </div>
