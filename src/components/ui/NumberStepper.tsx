@@ -40,16 +40,16 @@ export function NumberStepper({
       <div className="flex items-center gap-3">
         <button
           onClick={decrement}
-          className={`${btnSize} rounded-full bg-surface-2 border border-edge hover:border-lime/40 hover:bg-surface active:scale-95 transition-all flex items-center justify-center text-muted hover:text-white`}
+          className={`${btnSize} rounded-full bg-surface-2 border border-border hover:border-accent/30 active:scale-95 transition-all flex items-center justify-center text-muted hover:text-text`}
         >
           <Minus size={large ? 18 : 15} />
         </button>
-        <span className={`${valueSize} font-condensed font-bold text-white text-center tabular-nums`}>
+        <span className={`${valueSize} font-condensed font-bold text-text text-center tabular-nums`}>
           {display}
         </span>
         <button
           onClick={increment}
-          className={`${btnSize} rounded-full bg-surface-2 border border-edge hover:border-lime/40 hover:bg-surface active:scale-95 transition-all flex items-center justify-center text-muted hover:text-white`}
+          className={`${btnSize} rounded-full bg-surface-2 border border-border hover:border-accent/30 active:scale-95 transition-all flex items-center justify-center text-muted hover:text-text`}
         >
           <Plus size={large ? 18 : 15} />
         </button>

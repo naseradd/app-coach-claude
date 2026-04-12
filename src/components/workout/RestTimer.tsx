@@ -34,25 +34,25 @@ export function RestTimer() {
   const urgent = restRemaining <= 10
   const soon   = restRemaining <= 30 && !urgent
 
-  const ringColor = urgent ? '#FF2D5C' : soon ? '#FF8438' : '#A8FF3E'
+  const ringColor = urgent ? '#DC2626' : soon ? '#D97706' : '#059669'
 
-  const radius      = 110
+  const radius        = 110
   const circumference = 2 * Math.PI * radius
   const dashOffset    = circumference * (1 - progress)
 
-  const block       = session?.blocks[currentBlockIndex]
+  const block        = session?.blocks[currentBlockIndex]
   const nextExercise = block?.exercises[currentExerciseIndex]
-  const nextSet     = nextExercise?.sets[currentSetIndex]
+  const nextSet      = nextExercise?.sets[currentSetIndex]
 
   return (
-    <div className="fixed inset-0 bg-[#08080F] flex flex-col items-center justify-center z-50 px-6">
+    <div className="fixed inset-0 bg-[#0A0A0A] flex flex-col items-center justify-center z-50 px-6" style={{ minHeight: '100dvh' }}>
       {/* Label */}
-      <p className="font-condensed text-xs tracking-[0.25em] uppercase text-muted mb-6">Repos</p>
+      <p className="font-condensed text-xs tracking-[0.25em] uppercase text-[#6B6B6B] mb-6">Repos</p>
 
       {/* Ring + timer */}
       <div className="relative w-72 h-72 mb-8">
         <svg className="w-full h-full -rotate-90" viewBox="0 0 260 260">
-          <circle cx="130" cy="130" r={radius} fill="none" stroke="#1E1E2C" strokeWidth="6" />
+          <circle cx="130" cy="130" r={radius} fill="none" stroke="#1E1E1E" strokeWidth="6" />
           <circle
             cx="130" cy="130" r={radius}
             fill="none"
@@ -71,7 +71,7 @@ export function RestTimer() {
           >
             {timeStr}
           </span>
-          <span className="text-xs font-condensed text-muted tracking-wider uppercase">
+          <span className="text-xs font-condensed text-[#6B6B6B] tracking-wider uppercase">
             {restSeconds}s total
           </span>
         </div>
@@ -80,10 +80,10 @@ export function RestTimer() {
       {/* Next set preview */}
       {nextExercise && (
         <div className="text-center mb-10 space-y-1">
-          <p className="text-[10px] font-condensed tracking-[0.2em] uppercase text-faint">Suivant</p>
+          <p className="text-[10px] font-condensed tracking-[0.2em] uppercase text-[#444]">Suivant</p>
           <p className="text-base font-condensed font-bold text-white">{nextExercise.name}</p>
           {nextSet && (
-            <p className="text-xs text-muted">
+            <p className="text-xs text-[#6B6B6B]">
               {nextSet.duration_seconds
                 ? `${nextSet.duration_seconds}s`
                 : nextSet.reps
@@ -100,14 +100,14 @@ export function RestTimer() {
       <div className="flex gap-3">
         <button
           onClick={() => useWorkoutStore.setState({ restRemaining: restRemaining + 30 })}
-          className="flex items-center gap-1.5 px-5 py-3 rounded-full bg-surface border border-edge hover:border-muted text-muted hover:text-white font-condensed text-sm tracking-wide transition-all active:scale-95"
+          className="flex items-center gap-1.5 px-5 py-3 rounded-full bg-[#1A1A1A] border border-[#2A2A2A] hover:border-[#444] text-[#6B6B6B] hover:text-white font-condensed text-sm tracking-wide transition-all active:scale-95"
         >
           <Plus size={15} />
           +30s
         </button>
         <button
           onClick={skipRest}
-          className="flex items-center gap-1.5 px-6 py-3 rounded-full bg-lime text-[#08080F] font-condensed font-bold text-sm tracking-wide transition-all active:scale-95"
+          className="flex items-center gap-1.5 px-6 py-3 rounded-full bg-white text-[#0A0A0A] font-condensed font-bold text-sm tracking-wide transition-all active:scale-95"
         >
           <SkipForward size={15} />
           Passer

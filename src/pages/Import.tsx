@@ -16,7 +16,6 @@ export function Import() {
   const [showUrl,    setShowUrl]    = useState(false)
   const fileRef = useRef<HTMLInputElement>(null)
 
-  // Auto-detect URL param
   useEffect(() => {
     const result = decodeProgramFromUrl()
     if (!result) return
@@ -82,10 +81,10 @@ export function Import() {
 
   if (success) {
     return (
-      <div className="flex flex-col items-center justify-center flex-1 gap-5">
-        <CheckCircle size={56} className="text-win" strokeWidth={1.5} />
+      <div className="flex flex-col items-center justify-center flex-1 gap-5 bg-bg">
+        <CheckCircle size={56} className="text-green" strokeWidth={1.5} />
         <div className="text-center">
-          <p className="font-condensed text-2xl font-bold text-white">Programme importé !</p>
+          <p className="font-display text-2xl font-bold text-text">Programme importé !</p>
           <p className="text-muted text-sm mt-1 font-condensed">Redirection en cours…</p>
         </div>
       </div>
@@ -93,14 +92,14 @@ export function Import() {
   }
 
   return (
-    <div className="flex flex-col flex-1 px-4 pt-6 pb-28 space-y-5">
+    <div className="flex flex-col flex-1 px-4 pt-6 bg-bg space-y-5" style={{ paddingBottom: 'calc(5rem + env(safe-area-inset-bottom, 0px))' }}>
       {/* Header */}
       <div>
-        <h1 className="font-condensed font-bold text-2xl text-white tracking-wide">Importer un programme</h1>
+        <h1 className="font-display font-bold text-2xl text-text tracking-wide" style={{ fontWeight: 800 }}>Importer un programme</h1>
         <p className="text-sm text-muted mt-1 font-condensed">Colle le JSON généré par Claude.</p>
       </div>
 
-      {/* ─── Primary: Paste JSON ─── */}
+      {/* Primary: Paste JSON */}
       <div className="space-y-3">
         <p className="text-[10px] font-condensed tracking-widest uppercase text-muted flex items-center gap-1.5">
           <ClipboardPaste size={11} />
@@ -110,15 +109,15 @@ export function Import() {
           value={pasteText}
           onChange={(e) => setPasteText(e.target.value)}
           placeholder={'{\n  "program": { ... },\n  "sessions": [ ... ]\n}'}
-          className="w-full bg-surface-2 border border-edge focus:border-lime/50 rounded-xl px-4 py-3 text-xs text-[#EEEEFF] placeholder:text-faint outline-none transition-colors font-mono min-h-[180px] resize-none"
+          className="w-full bg-surface border border-border focus:border-accent/30 rounded-xl px-4 py-3 text-xs text-text placeholder:text-faint outline-none transition-colors font-mono min-h-[180px] resize-none shadow-sm"
         />
         <button
           onClick={handlePaste}
           disabled={!pasteText.trim()}
           className={`w-full flex items-center justify-center gap-2 py-4 rounded-2xl font-condensed font-bold text-base tracking-wide transition-all active:scale-[0.98] ${
             pasteText.trim()
-              ? 'bg-lime text-[#08080F] hover:bg-lime-bright'
-              : 'bg-surface-2 text-faint border border-edge cursor-not-allowed'
+              ? 'bg-accent text-white hover:bg-[#2a2a2a] shadow-sm'
+              : 'bg-surface-2 text-faint border border-border cursor-not-allowed'
           }`}
         >
           <Upload size={18} />
@@ -126,42 +125,40 @@ export function Import() {
         </button>
       </div>
 
-      {/* ─── Divider ─── */}
+      {/* Divider */}
       <div className="flex items-center gap-3">
-        <div className="flex-1 h-px bg-edge" />
+        <div className="flex-1 h-px bg-border" />
         <span className="text-[10px] font-condensed tracking-widest uppercase text-faint">ou</span>
-        <div className="flex-1 h-px bg-edge" />
+        <div className="flex-1 h-px bg-border" />
       </div>
 
-      {/* ─── Secondary methods ─── */}
+      {/* Secondary methods */}
       <div className="grid grid-cols-2 gap-3">
-        {/* File */}
         <button
           onClick={() => fileRef.current?.click()}
-          className="flex flex-col items-center justify-center gap-2 py-5 rounded-2xl bg-surface-2 border border-edge hover:border-lime/30 transition-all active:scale-[0.97]"
+          className="flex flex-col items-center justify-center gap-2 py-5 rounded-2xl bg-surface border border-border hover:border-accent/20 shadow-sm transition-all active:scale-[0.97]"
         >
           <FileJson size={22} className="text-muted" />
           <span className="text-xs font-condensed font-semibold text-muted tracking-wide">Fichier JSON</span>
         </button>
         <input ref={fileRef} type="file" accept=".json,application/json" onChange={handleFile} className="hidden" />
 
-        {/* URL */}
         <button
           onClick={() => setShowUrl((v) => !v)}
-          className={`flex flex-col items-center justify-center gap-2 py-5 rounded-2xl border transition-all active:scale-[0.97] ${
+          className={`flex flex-col items-center justify-center gap-2 py-5 rounded-2xl border shadow-sm transition-all active:scale-[0.97] ${
             showUrl
-              ? 'bg-lime/5 border-lime/30 text-lime'
-              : 'bg-surface-2 border-edge hover:border-lime/30'
+              ? 'bg-accent/5 border-accent/30 text-accent'
+              : 'bg-surface border-border hover:border-accent/20'
           }`}
         >
-          <Link size={22} className={showUrl ? 'text-lime' : 'text-muted'} />
-          <span className={`text-xs font-condensed font-semibold tracking-wide ${showUrl ? 'text-lime' : 'text-muted'}`}>
+          <Link size={22} className={showUrl ? 'text-accent' : 'text-muted'} />
+          <span className={`text-xs font-condensed font-semibold tracking-wide ${showUrl ? 'text-text' : 'text-muted'}`}>
             Via URL
           </span>
         </button>
       </div>
 
-      {/* URL input (expandable) */}
+      {/* URL input */}
       {showUrl && (
         <div className="space-y-3 animate-slide-up">
           <input
@@ -169,35 +166,24 @@ export function Import() {
             value={urlText}
             onChange={(e) => setUrlText(e.target.value)}
             placeholder="https://…?program=eyJ…"
-            className="w-full bg-surface-2 border border-edge focus:border-lime/50 rounded-xl px-4 py-3 text-sm text-[#EEEEFF] placeholder:text-faint outline-none transition-colors"
+            className="w-full bg-surface border border-border focus:border-accent/30 rounded-xl px-4 py-3 text-sm text-text placeholder:text-faint outline-none transition-colors"
           />
           <Button fullWidth onClick={handleUrlImport} disabled={!urlText.trim()}>
             Importer depuis l'URL
           </Button>
-          <div className="bg-surface-2 rounded-xl p-3 border border-edge">
-            <p className="text-xs text-muted font-condensed">
-              Claude peut générer un lien direct de la forme&nbsp;:
-            </p>
-            <p className="text-[11px] text-lime/80 font-mono mt-1 break-all">
-              https://naseradd.github.io/app-coach-claude/?program=eyJ…
-            </p>
-            <p className="text-xs text-muted font-condensed mt-1">
-              Ouvre ce lien depuis le chat — le programme s'importe automatiquement.
-            </p>
-          </div>
         </div>
       )}
 
       {/* Errors */}
       {errors.length > 0 && (
-        <div className="bg-loss/10 border border-loss/30 rounded-2xl p-4 space-y-2 animate-slide-up">
+        <div className="bg-red-lt border border-red/30 rounded-2xl p-4 space-y-2 animate-slide-up">
           <div className="flex items-center gap-2">
-            <AlertCircle size={15} className="text-loss flex-shrink-0" />
-            <p className="text-sm font-condensed font-semibold text-loss">Erreurs de validation</p>
+            <AlertCircle size={15} className="text-red flex-shrink-0" />
+            <p className="text-sm font-condensed font-semibold text-red">Erreurs de validation</p>
           </div>
           <ul className="space-y-1">
             {errors.map((e, i) => (
-              <li key={i} className="text-xs text-loss/80 font-mono">· {e}</li>
+              <li key={i} className="text-xs text-red/80 font-mono">· {e}</li>
             ))}
           </ul>
         </div>

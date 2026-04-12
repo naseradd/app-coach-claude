@@ -11,10 +11,10 @@ interface ExerciseCardProps {
 }
 
 const CATEGORY_BADGE: Record<string, { label: string; className: string }> = {
-  compound:  { label: 'Compound',  className: 'bg-warn/10 text-warn' },
-  isolation: { label: 'Isolation', className: 'bg-purple-900/30 text-purple-400' },
-  cardio:    { label: 'Cardio',    className: 'bg-lime/10 text-lime' },
-  mobility:  { label: 'Mobilité',  className: 'bg-sky-900/30 text-sky-400' },
+  compound:  { label: 'Compound',  className: 'bg-orange-lt text-orange' },
+  isolation: { label: 'Isolation', className: 'bg-violet-100 text-violet-600' },
+  cardio:    { label: 'Cardio',    className: 'bg-green-lt text-green' },
+  mobility:  { label: 'Mobilité',  className: 'bg-sky-100 text-sky-600' },
 }
 
 export function ExerciseCard({ exercise, logs, isActiveExercise, activeSetIndex }: ExerciseCardProps) {
@@ -41,7 +41,7 @@ export function ExerciseCard({ exercise, logs, isActiveExercise, activeSetIndex 
               </span>
             )}
           </div>
-          <h3 className="text-base font-condensed font-bold text-white tracking-wide leading-tight">
+          <h3 className="text-base font-display font-bold text-text tracking-wide leading-tight">
             {exercise.name}
           </h3>
           {exercise.muscle_groups_primary.length > 0 && (
@@ -54,7 +54,7 @@ export function ExerciseCard({ exercise, logs, isActiveExercise, activeSetIndex 
             onClick={() => setCuesOpen((v) => !v)}
             className={`flex items-center gap-1 text-xs px-2 py-1.5 rounded-lg transition-colors flex-shrink-0 font-condensed ${
               cuesOpen
-                ? 'bg-lime/10 text-lime'
+                ? 'bg-green-lt text-green'
                 : 'text-faint hover:text-muted hover:bg-surface-2'
             }`}
           >
@@ -67,10 +67,10 @@ export function ExerciseCard({ exercise, logs, isActiveExercise, activeSetIndex 
 
       {/* Coaching cues */}
       {cuesOpen && exercise.coaching_cues.length > 0 && (
-        <div className="bg-surface-2 border border-lime/20 rounded-xl p-3 space-y-1.5 animate-slide-up">
+        <div className="bg-green-lt/50 border border-green/20 rounded-xl p-3 space-y-1.5 animate-slide-up">
           {exercise.coaching_cues.map((cue, i) => (
-            <div key={i} className="flex gap-2 text-sm text-[#EEEEFF]">
-              <span className="text-lime flex-shrink-0 mt-0.5">·</span>
+            <div key={i} className="flex gap-2 text-sm text-text">
+              <span className="text-green flex-shrink-0 mt-0.5">·</span>
               <span>{cue}</span>
             </div>
           ))}
@@ -80,7 +80,7 @@ export function ExerciseCard({ exercise, logs, isActiveExercise, activeSetIndex 
       {/* Progression note */}
       {exercise.progression_note && (
         <div className="flex items-start gap-1.5 px-1">
-          <Zap size={12} className="text-lime flex-shrink-0 mt-0.5" />
+          <Zap size={12} className="text-orange flex-shrink-0 mt-0.5" />
           <p className="text-xs text-muted italic">{exercise.progression_note}</p>
         </div>
       )}

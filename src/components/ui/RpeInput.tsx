@@ -26,8 +26,8 @@ export function RpeInput({ value, onChange }: RpeInputProps) {
             onClick={() => onChange(value === v ? null : v)}
             className={`flex-1 h-9 rounded-lg text-xs font-condensed font-semibold tracking-wide transition-all active:scale-95 ${
               value === v
-                ? 'bg-lime text-[#08080F]'
-                : 'bg-surface-2 text-muted border border-edge hover:border-lime/30 hover:text-white'
+                ? 'bg-accent text-white'
+                : 'bg-surface-2 text-muted border border-border hover:border-accent/30 hover:text-text'
             }`}
           >
             {v}

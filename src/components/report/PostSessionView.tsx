@@ -26,11 +26,11 @@ export function PostSessionView() {
   }
 
   return (
-    <div className="flex flex-col flex-1 px-5 py-12 space-y-8 overflow-y-auto pb-28">
+    <div className="flex flex-col flex-1 px-5 py-12 space-y-8 overflow-y-auto bg-bg" style={{ paddingBottom: 'calc(7rem + env(safe-area-inset-bottom, 0px))' }}>
       {/* Hero */}
       <div className="text-center space-y-3">
         <div className="text-6xl">🏆</div>
-        <h2 className="font-display text-5xl text-white tracking-wide">Séance terminée</h2>
+        <h2 className="font-display text-4xl text-text tracking-wide" style={{ fontWeight: 800 }}>Séance terminée</h2>
         <p className="text-muted font-condensed">Comment tu t'es senti ?</p>
       </div>
 
@@ -44,12 +44,12 @@ export function PostSessionView() {
               onClick={() => setFeeling(feeling === v ? null : v)}
               className={`flex flex-col items-center justify-center py-3 rounded-xl transition-all active:scale-95 ${
                 feeling === v
-                  ? 'bg-lime border border-lime text-[#08080F]'
-                  : 'bg-surface-2 border border-edge text-muted hover:border-lime/30'
+                  ? 'bg-accent border border-accent text-white'
+                  : 'bg-surface border border-border text-muted hover:border-accent/30'
               }`}
             >
               <span className="text-xl">{FEELING_EMOJI[v]}</span>
-              <span className={`text-xs font-condensed font-bold mt-0.5 ${feeling === v ? 'text-[#08080F]' : 'text-faint'}`}>{v}</span>
+              <span className={`text-xs font-condensed font-bold mt-0.5 ${feeling === v ? 'text-white' : 'text-faint'}`}>{v}</span>
             </button>
           ))}
         </div>
@@ -62,7 +62,7 @@ export function PostSessionView() {
           value={notes}
           onChange={(e) => setNotes(e.target.value)}
           placeholder="Observations, ce qui a bien marché..."
-          className="w-full bg-surface-2 border border-edge focus:border-lime/40 rounded-xl px-4 py-3 text-sm text-[#EEEEFF] placeholder:text-faint resize-none outline-none transition-colors min-h-[90px]"
+          className="w-full bg-surface border border-border focus:border-accent/40 rounded-xl px-4 py-3 text-sm text-text placeholder:text-faint resize-none outline-none transition-colors min-h-[90px]"
           rows={3}
         />
       </div>

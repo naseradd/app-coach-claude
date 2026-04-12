@@ -42,15 +42,11 @@ export function SetRow({ exerciseId, set, log, isActive, isCurrent, category }: 
   const mode = getInputMode(category, set)
   const [expanded, setExpanded] = useState(isCurrent && isActive)
 
-  // Strength inputs
   const [reps,   setReps]   = useState<number | null>(set.reps ?? null)
   const [weight, setWeight] = useState<number | null>(set.weight_kg ?? null)
   const [rpe,    setRpe]    = useState<number | null>(null)
-
-  // Timed input
   const [duration, setDuration] = useState<number | null>(set.duration_seconds ?? null)
 
-  // Cardio: stopwatch
   const [running,     setRunning]     = useState(false)
   const [elapsed,     setElapsed]     = useState(0)
   const [distanceKm,  setDistanceKm]  = useState<number | null>(null)
@@ -105,43 +101,43 @@ export function SetRow({ exerciseId, set, log, isActive, isCurrent, category }: 
       const finalDuration = running ? elapsed : elapsed || null
       if (running) { clearInterval(timerRef.current!); setRunning(false) }
       completeSet(exerciseId, set.set_number, {
-        actual_reps:      finalDuration,
-        actual_weight_kg: distanceKm,
-        rpe_actual:       null,
-        type:             set.type,
-        planned_reps:     set.reps,
+        actual_reps:       finalDuration,
+        actual_weight_kg:  distanceKm,
+        rpe_actual:        null,
+        type:              set.type,
+        planned_reps:      set.reps,
         planned_weight_kg: set.weight_kg,
       }, set.rest_seconds)
       return
     }
     if (mode === 'timed') {
       completeSet(exerciseId, set.set_number, {
-        actual_reps:      duration,
-        actual_weight_kg: weight,
-        rpe_actual:       rpe,
-        type:             set.type,
-        planned_reps:     set.reps,
+        actual_reps:       duration,
+        actual_weight_kg:  weight,
+        rpe_actual:        rpe,
+        type:              set.type,
+        planned_reps:      set.reps,
         planned_weight_kg: set.weight_kg,
       }, set.rest_seconds)
       return
     }
     completeSet(exerciseId, set.set_number, {
-      actual_reps:      reps,
-      actual_weight_kg: weight,
-      rpe_actual:       rpe,
-      type:             set.type,
-      planned_reps:     set.reps,
+      actual_reps:       reps,
+      actual_weight_kg:  weight,
+      rpe_actual:        rpe,
+      type:              set.type,
+      planned_reps:      set.reps,
       planned_weight_kg: set.weight_kg,
     }, set.rest_seconds)
   }
 
   const borderClass = completed && !skipped
-    ? 'border-win/40 bg-win/5'
+    ? 'border-green/40 bg-green-lt/20'
     : skipped
-    ? 'border-edge opacity-40'
+    ? 'border-border opacity-50'
     : isCurrent && isActive
-    ? 'border-lime/50 bg-lime/5'
-    : 'border-edge bg-surface'
+    ? 'border-accent/30 bg-surface-2/50 shadow-sm'
+    : 'border-border bg-surface'
 
   return (
     <div className={`border rounded-2xl transition-all ${borderClass}`}>
@@ -153,12 +149,12 @@ export function SetRow({ exerciseId, set, log, isActive, isCurrent, category }: 
         {/* Set number bubble */}
         <div className={`w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 text-xs font-condensed font-bold ${
           completed && !skipped
-            ? 'bg-win text-[#08080F]'
+            ? 'bg-green text-white'
             : skipped
-            ? 'bg-edge text-faint'
+            ? 'bg-surface-2 text-faint'
             : isCurrent && isActive
-            ? 'bg-lime text-[#08080F]'
-            : 'bg-surface-2 text-muted border border-edge'
+            ? 'bg-accent text-white'
+            : 'bg-surface-2 text-muted border border-border'
         }`}>
           {completed && !skipped ? <Check size={13} /> : set.set_number}
         </div>
@@ -167,25 +163,24 @@ export function SetRow({ exerciseId, set, log, isActive, isCurrent, category }: 
           <div className="flex items-center gap-2">
             <span className={`text-[10px] px-1.5 py-0.5 rounded font-condensed font-semibold tracking-wide ${
               set.type === 'warmup'
-                ? 'bg-sky-900/40 text-sky-400'
+                ? 'bg-sky-100 text-sky-600'
                 : mode === 'cardio'
-                ? 'bg-lime/10 text-lime'
+                ? 'bg-green-lt text-green'
                 : mode === 'timed'
-                ? 'bg-purple-900/30 text-purple-400'
+                ? 'bg-violet-100 text-violet-600'
                 : 'bg-surface-2 text-muted'
             }`}>
               {mode === 'cardio' ? 'Cardio' : SET_TYPE_LABEL[set.type] ?? set.type}
             </span>
-            <span className="text-sm text-[#EEEEFF] font-condensed truncate">{targetLabel()}</span>
+            <span className="text-sm text-text font-condensed truncate">{targetLabel()}</span>
           </div>
           {set.rpe_target && !completed && (
             <span className="text-[11px] text-muted">RPE cible {set.rpe_target}</span>
           )}
         </div>
 
-        {/* Completed summary */}
         {completed && !skipped && (
-          <span className="text-xs text-win font-condensed flex-shrink-0">{completedLabel()}</span>
+          <span className="text-xs text-green font-condensed flex-shrink-0">{completedLabel()}</span>
         )}
 
         {!completed && !skipped && (
@@ -197,18 +192,15 @@ export function SetRow({ exerciseId, set, log, isActive, isCurrent, category }: 
 
       {/* Expanded form */}
       {expanded && !completed && !skipped && (
-        <div className="px-3 pb-4 pt-1 border-t border-edge space-y-4 animate-slide-up">
+        <div className="px-3 pb-4 pt-1 border-t border-border space-y-4 animate-slide-up">
 
           {/* ─── CARDIO mode ─── */}
           {mode === 'cardio' && (
             <div className="space-y-4">
-              {/* Stopwatch */}
               <div className="flex flex-col items-center gap-3 py-2">
-                <span
-                  className={`text-6xl font-display tracking-wider tabular-nums ${
-                    running ? 'text-lime' : elapsed > 0 ? 'text-white' : 'text-faint'
-                  }`}
-                >
+                <span className={`text-6xl font-display tracking-wider tabular-nums ${
+                  running ? 'text-green' : elapsed > 0 ? 'text-text' : 'text-faint'
+                }`}>
                   {formatSecs(elapsed)}
                 </span>
                 {set.duration_seconds && (
@@ -220,15 +212,13 @@ export function SetRow({ exerciseId, set, log, isActive, isCurrent, category }: 
                   onClick={toggleCardioTimer}
                   className={`flex items-center gap-2 px-6 py-3 rounded-full font-condensed font-bold text-sm tracking-wide transition-all active:scale-95 ${
                     running
-                      ? 'bg-warn/15 border border-warn/40 text-warn'
-                      : 'bg-lime text-[#08080F]'
+                      ? 'bg-orange-lt border border-orange/30 text-orange'
+                      : 'bg-accent text-white'
                   }`}
                 >
                   {running ? <><Pause size={15} /> Pause</> : <><Play size={15} /> {elapsed > 0 ? 'Reprendre' : 'Démarrer'}</>}
                 </button>
               </div>
-
-              {/* Distance input */}
               <NumberStepper
                 label="Distance (km)"
                 value={distanceKm}
@@ -301,13 +291,13 @@ export function SetRow({ exerciseId, set, log, isActive, isCurrent, category }: 
           )}
 
           {set.notes && (
-            <p className="text-xs text-muted italic px-1 border-l-2 border-edge pl-3">{set.notes}</p>
+            <p className="text-xs text-muted italic px-1 border-l-2 border-border pl-3">{set.notes}</p>
           )}
 
           <div className="flex gap-2 pt-1">
             <button
               onClick={() => skipSet(exerciseId, set.set_number)}
-              className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-condensed text-faint hover:text-muted transition-colors"
+              className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-condensed text-muted hover:text-text border border-border bg-surface-2 transition-colors"
             >
               <SkipForward size={13} />
               Passer
