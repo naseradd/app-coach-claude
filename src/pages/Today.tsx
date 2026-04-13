@@ -1,11 +1,12 @@
-import { useState } from 'react'
-import { Play, Upload, Zap } from 'lucide-react'
+import { useState, useEffect } from 'react'
+import { Play, Upload, Zap, CheckCircle2 } from 'lucide-react'
 import { useProgramStore } from '../store/program.store'
 import { useWorkoutStore } from '../store/workout.store'
 import { WorkoutView } from '../components/workout/WorkoutView'
 import { Card } from '../components/ui/Card'
-import type { WorkoutSession } from '../schemas'
+import type { WorkoutSession, SessionReport } from '../schemas'
 import { useNavigate } from 'react-router-dom'
+import { getAllReports } from '../db'
 
 const WEEKDAYS = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday']
 const WEEKDAY_FR = ['Dimanche', 'Lundi', 'Mardi', 'Mercredi', 'Jeudi', 'Vendredi', 'Samedi']
@@ -17,7 +18,10 @@ export function Today() {
   const [energyLevel,    setEnergyLevel]    = useState<number | null>(null)
   const [selectedSession, setSelectedSession] = useState<WorkoutSession | null>(null)
   const [pickingSession, setPickingSession]  = useState(false)
+  const [reports, setReports] = useState<SessionReport[]>([])
   const navigate = useNavigate()
+
+  useEffect(() => { getAllReports().then(setReports) }, [])
 
   if (phase === 'active' || phase === 'rest' || phase === 'post_session' || phase === 'completed') {
     return <WorkoutView />
@@ -55,6 +59,17 @@ export function Today() {
   const sessionToUse = selectedSession ?? todaySession
 
   if (pickingSession) {
+    // Sessions not yet done come first
+    const doneCountBySession = reports.reduce<Record<string, number>>((acc, r) => {
+      acc[r.session_id] = (acc[r.session_id] ?? 0) + 1
+      return acc
+    }, {})
+    const sorted = [...currentProgram.sessions].sort((a, b) => {
+      const da = doneCountBySession[a.id] ?? 0
+      const db = doneCountBySession[b.id] ?? 0
+      return da - db
+    })
+
     return (
       <div className="flex flex-col flex-1 px-4 pt-6 bg-bg space-y-4" style={{ paddingBottom: 'calc(5rem + env(safe-area-inset-bottom, 0px))' }}>
         <div className="flex items-center gap-3 mb-2">
@@ -66,7 +81,8 @@ export function Today() {
           </button>
           <h2 className="text-base font-display font-bold text-text tracking-wide">Choisir une séance</h2>
         </div>
-        {currentProgram.sessions.map((s) => {
+        {sorted.map((s) => {
+          const doneCount = doneCountBySession[s.id] ?? 0
           const totalSets = s.blocks.flatMap((b) => b.exercises.flatMap((e) => e.sets.filter((set) => set.type !== 'warmup'))).length
           return (
             <Card
@@ -74,7 +90,19 @@ export function Today() {
               className="p-4"
               onClick={() => { setSelectedSession(s); setPickingSession(false) }}
             >
-              <p className="font-display font-bold text-text text-base tracking-wide">{s.name}</p>
+              <div className="flex items-start justify-between gap-2">
+                <p className="font-display font-bold text-text text-base tracking-wide">{s.name}</p>
+                {doneCount > 0 ? (
+                  <span className="flex items-center gap-1 text-[10px] font-condensed text-muted bg-surface-2 border border-border px-1.5 py-0.5 rounded flex-shrink-0">
+                    <CheckCircle2 size={9} className="text-green" />
+                    {doneCount}×
+                  </span>
+                ) : (
+                  <span className="text-[10px] font-condensed text-green bg-green-lt border border-green/20 px-1.5 py-0.5 rounded flex-shrink-0">
+                    Non faite
+                  </span>
+                )}
+              </div>
               <div className="flex items-center gap-2 mt-1">
                 {s.scheduled_weekday && (
                   <span className="text-xs text-muted capitalize font-condensed">{s.scheduled_weekday}</span>

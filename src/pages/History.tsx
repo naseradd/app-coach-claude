@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
-import { Clock, TrendingUp, CheckCircle, Share2, ChevronRight, BarChart2, ArrowLeft } from 'lucide-react'
-import { getAllReports } from '../db'
+import { Clock, TrendingUp, CheckCircle, Share2, ChevronRight, BarChart2, ArrowLeft, Trash2 } from 'lucide-react'
+import { getAllReports, deleteReport } from '../db'
 import { useProgramStore } from '../store/program.store'
 import { buildCoachingContext } from '../utils/exportContext'
 import type { SessionReport } from '../schemas'
@@ -11,6 +11,7 @@ export function History() {
   const [reports,  setReports]  = useState<SessionReport[]>([])
   const [selected, setSelected] = useState<SessionReport | null>(null)
   const [copyMsg,  setCopyMsg]  = useState<string | null>(null)
+  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null)
 
   useEffect(() => { getAllReports().then(setReports) }, [])
 
@@ -21,7 +22,22 @@ export function History() {
     setTimeout(() => setCopyMsg(null), 2000)
   }
 
-  if (selected) return <ReportDetail report={selected} onBack={() => setSelected(null)} />
+  async function handleDelete(id: string) {
+    await deleteReport(id)
+    setReports((prev) => prev.filter((r) => r.id !== id))
+    setConfirmDeleteId(null)
+    if (selected?.id === id) setSelected(null)
+  }
+
+  if (selected) {
+    return (
+      <ReportDetail
+        report={selected}
+        onBack={() => setSelected(null)}
+        onDelete={() => handleDelete(selected.id)}
+      />
+    )
+  }
 
   return (
     <div className="flex flex-col flex-1 px-4 pt-6 bg-bg space-y-5" style={{ paddingBottom: 'calc(5rem + env(safe-area-inset-bottom, 0px))' }}>
@@ -58,46 +74,80 @@ export function History() {
             const date = new Date(r.started_at)
             const pct  = Math.round(r.completion_rate * 100)
             const vol  = r.volume_summary.total_volume_kg
-            return (
-              <Card key={r.id} className="p-4" onClick={() => setSelected(r)}>
-                <div className="flex items-start justify-between">
-                  <div className="flex-1 min-w-0">
-                    <p className="font-display font-bold text-text tracking-wide truncate">{r.session_name}</p>
-                    <p className="text-xs text-muted mt-0.5 font-condensed">
-                      {date.toLocaleDateString('fr-CA', { weekday: 'short', day: 'numeric', month: 'short' })}
-                      {' · '}{r.duration_actual_minutes} min
-                    </p>
-                  </div>
-                  <ChevronRight size={15} className="text-faint flex-shrink-0 mt-1" />
-                </div>
+            const isConfirming = confirmDeleteId === r.id
 
-                <div className="mt-3 flex items-center gap-4">
-                  <div className="flex-1">
-                    <div className="flex justify-between text-[10px] font-condensed mb-1">
-                      <span className="text-faint tracking-wide uppercase">Complétion</span>
-                      <span className={pct >= 80 ? 'text-green' : 'text-orange'}>{pct}%</span>
+            return (
+              <div key={r.id} className="relative">
+                <Card className="p-4" onClick={() => !isConfirming && setSelected(r)}>
+                  <div className="flex items-start justify-between">
+                    <div className="flex-1 min-w-0">
+                      <p className="font-display font-bold text-text tracking-wide truncate">{r.session_name}</p>
+                      <p className="text-xs text-muted mt-0.5 font-condensed">
+                        {date.toLocaleDateString('fr-CA', { weekday: 'short', day: 'numeric', month: 'short' })}
+                        {' · '}{r.duration_actual_minutes} min
+                      </p>
                     </div>
-                    <div className="h-1 bg-border rounded-full overflow-hidden">
-                      <div
-                        className={`h-full rounded-full transition-all ${pct >= 80 ? 'bg-green' : 'bg-orange'}`}
-                        style={{ width: `${pct}%` }}
-                      />
+                    <div className="flex items-center gap-1 flex-shrink-0">
+                      <button
+                        onClick={(e) => { e.stopPropagation(); setConfirmDeleteId(isConfirming ? null : r.id) }}
+                        className="w-7 h-7 rounded-lg flex items-center justify-center text-faint hover:text-red transition-colors"
+                      >
+                        <Trash2 size={13} />
+                      </button>
+                      {!isConfirming && <ChevronRight size={15} className="text-faint" />}
                     </div>
                   </div>
-                  {vol > 0 && (
-                    <div className="text-right flex-shrink-0">
-                      <p className="font-condensed font-bold text-sm text-text">{vol.toLocaleString()} <span className="text-faint font-normal text-xs">kg</span></p>
+
+                  {/* Inline delete confirm */}
+                  {isConfirming && (
+                    <div className="flex gap-2 mt-3 animate-slide-up">
+                      <button
+                        onClick={(e) => { e.stopPropagation(); setConfirmDeleteId(null) }}
+                        className="flex-1 py-2 rounded-lg bg-surface-2 border border-border text-xs font-condensed font-semibold text-muted transition-all active:scale-95"
+                      >
+                        Annuler
+                      </button>
+                      <button
+                        onClick={(e) => { e.stopPropagation(); handleDelete(r.id) }}
+                        className="flex-1 py-2 rounded-lg bg-red text-white text-xs font-condensed font-semibold transition-all active:scale-95"
+                      >
+                        Supprimer
+                      </button>
                     </div>
                   )}
-                </div>
 
-                {r.post_session.overall_feeling !== null && (
-                  <div className="mt-2 flex items-center gap-1.5">
-                    <CheckCircle size={11} className="text-green" />
-                    <span className="text-[11px] text-muted font-condensed">Ressenti {r.post_session.overall_feeling}/10</span>
-                  </div>
-                )}
-              </Card>
+                  {!isConfirming && (
+                    <>
+                      <div className="mt-3 flex items-center gap-4">
+                        <div className="flex-1">
+                          <div className="flex justify-between text-[10px] font-condensed mb-1">
+                            <span className="text-faint tracking-wide uppercase">Complétion</span>
+                            <span className={pct >= 80 ? 'text-green' : 'text-orange'}>{pct}%</span>
+                          </div>
+                          <div className="h-1 bg-border rounded-full overflow-hidden">
+                            <div
+                              className={`h-full rounded-full transition-all ${pct >= 80 ? 'bg-green' : 'bg-orange'}`}
+                              style={{ width: `${pct}%` }}
+                            />
+                          </div>
+                        </div>
+                        {vol > 0 && (
+                          <div className="text-right flex-shrink-0">
+                            <p className="font-condensed font-bold text-sm text-text">{vol.toLocaleString()} <span className="text-faint font-normal text-xs">kg</span></p>
+                          </div>
+                        )}
+                      </div>
+
+                      {r.post_session.overall_feeling !== null && (
+                        <div className="mt-2 flex items-center gap-1.5">
+                          <CheckCircle size={11} className="text-green" />
+                          <span className="text-[11px] text-muted font-condensed">Ressenti {r.post_session.overall_feeling}/10</span>
+                        </div>
+                      )}
+                    </>
+                  )}
+                </Card>
+              </div>
             )
           })}
         </div>
@@ -106,7 +156,9 @@ export function History() {
   )
 }
 
-function ReportDetail({ report, onBack }: { report: SessionReport; onBack: () => void }) {
+function ReportDetail({ report, onBack, onDelete }: { report: SessionReport; onBack: () => void; onDelete: () => void }) {
+  const [confirmDelete, setConfirmDelete] = useState(false)
+
   return (
     <div className="flex flex-col flex-1 bg-bg" style={{ paddingBottom: 'calc(5rem + env(safe-area-inset-bottom, 0px))' }}>
       <div className="px-4 pt-4 pb-3 border-b border-border bg-surface flex items-center gap-3">
@@ -116,13 +168,38 @@ function ReportDetail({ report, onBack }: { report: SessionReport; onBack: () =>
         >
           <ArrowLeft size={15} />
         </button>
-        <div>
-          <h2 className="font-display font-bold text-text tracking-wide">{report.session_name}</h2>
+        <div className="flex-1 min-w-0">
+          <h2 className="font-display font-bold text-text tracking-wide truncate">{report.session_name}</h2>
           <p className="text-xs text-muted font-condensed">
             {new Date(report.started_at).toLocaleDateString('fr-CA', { weekday: 'long', day: 'numeric', month: 'long' })}
           </p>
         </div>
+        <button
+          onClick={() => setConfirmDelete(true)}
+          className="w-8 h-8 rounded-full bg-surface-2 border border-border flex items-center justify-center text-muted hover:text-red transition-colors"
+        >
+          <Trash2 size={14} />
+        </button>
       </div>
+
+      {/* Delete confirm bar */}
+      {confirmDelete && (
+        <div className="px-4 py-3 bg-red-lt border-b border-red/20 flex items-center gap-3 animate-slide-up">
+          <p className="text-xs font-condensed text-red flex-1">Supprimer cette séance ?</p>
+          <button
+            onClick={() => setConfirmDelete(false)}
+            className="px-3 py-1.5 rounded-lg bg-surface border border-border text-xs font-condensed font-semibold text-muted transition-all active:scale-95"
+          >
+            Annuler
+          </button>
+          <button
+            onClick={onDelete}
+            className="px-3 py-1.5 rounded-lg bg-red text-white text-xs font-condensed font-semibold transition-all active:scale-95"
+          >
+            Supprimer
+          </button>
+        </div>
+      )}
 
       <div className="overflow-y-auto px-4 py-4 space-y-4">
         {/* Stats */}

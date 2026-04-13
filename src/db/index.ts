@@ -87,6 +87,10 @@ export async function getAllPrograms(): Promise<StoredProgram[]> {
   return db.programs.orderBy('imported_at').reverse().toArray()
 }
 
+export async function deleteProgram(id: string): Promise<void> {
+  await db.programs.delete(id)
+}
+
 // ─── Report helpers ───────────────────────────────────────────────────────────
 
 export async function saveReport(report: SessionReport): Promise<void> {
@@ -105,6 +109,10 @@ export async function getAllReports(): Promise<SessionReport[]> {
 export async function getReportsByProgram(programId: string): Promise<SessionReport[]> {
   const all = await getAllReports()
   return all.filter((r) => r.program_id === programId)
+}
+
+export async function deleteReport(id: string): Promise<void> {
+  await db.reports.delete(id)
 }
 
 // ─── Settings helpers ─────────────────────────────────────────────────────────

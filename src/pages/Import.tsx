@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
-import { Upload, Link, CheckCircle, AlertCircle, FileJson, ClipboardPaste } from 'lucide-react'
+import { Upload, Link, CheckCircle, AlertCircle, FileJson, ClipboardPaste, Clipboard } from 'lucide-react'
 import { useProgramStore } from '../store/program.store'
 import { parseProgram, decodeProgramFromUrl } from '../utils/importProgram'
 import { Button } from '../components/ui/Button'
@@ -101,10 +101,26 @@ export function Import() {
 
       {/* Primary: Paste JSON */}
       <div className="space-y-3">
-        <p className="text-[10px] font-condensed tracking-widest uppercase text-muted flex items-center gap-1.5">
-          <ClipboardPaste size={11} />
-          Coller le JSON
-        </p>
+        <div className="flex items-center justify-between">
+          <p className="text-[10px] font-condensed tracking-widest uppercase text-muted flex items-center gap-1.5">
+            <ClipboardPaste size={11} />
+            Coller le JSON
+          </p>
+          <button
+            onClick={async () => {
+              try {
+                const text = await navigator.clipboard.readText()
+                if (text) setPasteText(text)
+              } catch {
+                setErrors(['Accès au presse-papiers refusé'])
+              }
+            }}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-surface border border-border text-xs font-condensed font-semibold text-muted hover:text-text hover:border-accent/30 transition-all active:scale-95"
+          >
+            <Clipboard size={13} />
+            Coller
+          </button>
+        </div>
         <textarea
           value={pasteText}
           onChange={(e) => setPasteText(e.target.value)}
