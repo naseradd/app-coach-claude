@@ -10,6 +10,7 @@ import { programsRoute } from './routes/programs.js';
 import { sessionsRoute } from './routes/sessions.js';
 import { setupRoute } from './routes/setup.js';
 import { dataRoute } from './routes/data.js';
+import { eventsRoute } from './routes/events.js';
 
 const env = loadEnv();
 const db = openDb(env.DB_PATH);
@@ -25,6 +26,7 @@ api.route('/program', programsRoute(db));
 api.route('/sessions', sessionsRoute(db));
 api.route('/setup-status', setupRoute(db));
 api.route('/data', dataRoute(db));
+api.route('/events', eventsRoute);
 app.route('/api', api);
 
 serve({ fetch: app.fetch, port: env.PORT }, (info) => {
