@@ -12,3 +12,4 @@ coverage
 packages/server/data
 packages/server/dist-web
 .fly
+*.tsbuildinfo
