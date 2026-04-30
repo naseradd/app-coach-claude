@@ -1,5 +1,4 @@
-export const SCHEMA_VERSION = '1.0.0' as const;
-
+export * from './schemas/version.js';
 export * from './schemas/primitives.js';
 export * from './schemas/set.js';
 export * from './schemas/exercise.js';

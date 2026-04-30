@@ -1,9 +1,11 @@
 import { z } from 'zod';
 import { Uuid, IsoDate, Rpe } from './primitives.js';
+import { SetType } from './set.js';
+import { SCHEMA_VERSION } from './version.js';
 
 export const SetLog = z.object({
   set_number: z.number().int().positive(),
-  type: z.enum(['warmup', 'working', 'amrap', 'dropset', 'backoff', 'timed']),
+  type: SetType,
   planned_reps: z.number().int().nullable(),
   actual_reps: z.number().int().nullable(),
   planned_weight_kg: z.number().nullable(),
@@ -15,24 +17,24 @@ export const SetLog = z.object({
   duration_seconds: z.number().nonnegative().nullable(),
   completed: z.boolean(),
   is_pr: z.boolean().default(false),
-  notes: z.string().default(''),
+  notes: z.string().max(2000).default(''),
 });
 
 export const ExerciseLog = z.object({
   exercise_id: Uuid,
-  exercise_name: z.string(),
+  exercise_name: z.string().min(1).max(200),
   completed: z.boolean(),
   skipped: z.boolean(),
   sets_log: z.array(SetLog),
-  notes: z.string().default(''),
+  notes: z.string().max(2000).default(''),
 });
 
 export const SessionReport = z.object({
-  schema_version: z.literal('1.0.0'),
+  schema_version: z.literal(SCHEMA_VERSION),
   id: Uuid,
   program_id: Uuid,
   session_id: Uuid,
-  session_name: z.string(),
+  session_name: z.string().min(1).max(200),
   started_at: IsoDate,
   completed_at: IsoDate,
   duration_actual_minutes: z.number().int().positive(),
@@ -41,12 +43,12 @@ export const SessionReport = z.object({
     energy_level: z.number().min(1).max(10).nullable(),
     sleep_quality: z.number().min(1).max(10).nullable(),
     soreness_level: z.number().min(1).max(10).nullable(),
-    notes: z.string().default(''),
+    notes: z.string().max(2000).default(''),
   }),
   post_session: z.object({
     overall_feeling: z.number().min(1).max(5),
     difficulty_perceived: z.number().min(1).max(10).nullable(),
-    notes: z.string().default(''),
+    notes: z.string().max(2000).default(''),
   }),
   exercises_log: z.array(ExerciseLog),
   volume_summary: z.object({

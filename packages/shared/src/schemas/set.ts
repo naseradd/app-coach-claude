@@ -14,6 +14,6 @@ export const WorkSet = z.object({
   rpe_target: Rpe.nullable(),
   duration_seconds: z.number().positive().nullable(),
   rest_seconds: z.number().nonnegative(),
-  notes: z.string().default(''),
+  notes: z.string().max(2000).default(''),
 });
 export type WorkSet = z.infer<typeof WorkSet>;
