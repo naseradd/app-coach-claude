@@ -106,4 +106,12 @@ describe('sessions route', () => {
     const one = await app.request(`/sessions/${reportId}`);
     expect(one.status).toBe(200);
   });
+
+  it('rejects bad query params with 400', async () => {
+    const db = openDb(':memory:');
+    runMigrations(db);
+    const app = new Hono().route('/sessions', sessionsRoute(db));
+    const res = await app.request('/sessions?limit=abc');
+    expect(res.status).toBe(400);
+  });
 });
