@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <rect width="512" height="512" fill="#0A0A0B"/>
+  <rect x="40" y="40" width="432" height="432" stroke="#C5FF00" stroke-width="4" fill="none"/>
+  <text x="256" y="338" font-family="ui-monospace,monospace" font-size="300" font-weight="800" fill="#C5FF00" text-anchor="middle" letter-spacing="-16">C</text>
+  <text x="256" y="416" font-family="ui-monospace,monospace" font-size="40" font-weight="700" fill="#C5FF00" text-anchor="middle" letter-spacing="6">COACH</text>
+</svg>
