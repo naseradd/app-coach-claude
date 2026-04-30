@@ -32,16 +32,20 @@ export function runMigrations(db: DB): void {
     applied_at TEXT NOT NULL
   )`);
   const applied = new Set(
-    db.prepare('SELECT version FROM _migrations').all().map((r: any) => r.version),
+    (db.prepare('SELECT version FROM _migrations').all() as { version: number }[]).map((r) => r.version),
   );
   const migs = loadMigrations();
   const insertMig = db.prepare('INSERT INTO _migrations (version, applied_at) VALUES (?, ?)');
   for (const m of migs) {
     if (applied.has(m.version)) continue;
-    db.transaction(() => {
-      db.exec(m.sql);
-      insertMig.run(m.version, new Date().toISOString());
-    })();
+    try {
+      db.transaction(() => {
+        db.exec(m.sql);
+        insertMig.run(m.version, new Date().toISOString());
+      })();
+    } catch (err) {
+      throw new Error(`migration failed: ${m.name}`, { cause: err });
+    }
     console.log(`migration applied: ${m.name}`);
   }
 }

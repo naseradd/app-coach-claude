@@ -41,8 +41,3 @@ CREATE TABLE IF NOT EXISTS active_session (
   state_json TEXT NOT NULL,
   updated_at TEXT NOT NULL
 );
-
-CREATE TABLE IF NOT EXISTS _migrations (
-  version INTEGER PRIMARY KEY,
-  applied_at TEXT NOT NULL
-);

@@ -6,10 +6,11 @@ describe('db migrations', () => {
   it('applies all migrations on a fresh in-memory db', () => {
     const db = openDb(':memory:');
     runMigrations(db);
-    const tables = db
-      .prepare(`SELECT name FROM sqlite_master WHERE type='table' ORDER BY name`)
-      .all()
-      .map((r: any) => r.name);
+    const tables = (
+      db
+        .prepare(`SELECT name FROM sqlite_master WHERE type='table' ORDER BY name`)
+        .all() as { name: string }[]
+    ).map((r) => r.name);
     expect(tables).toContain('profile');
     expect(tables).toContain('programs');
     expect(tables).toContain('session_reports');
