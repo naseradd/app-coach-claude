@@ -1,0 +1,80 @@
+:root {
+  --r-sm: 10px; --r-md: 14px; --r-lg: 18px; --r-xl: 26px; --r-pill: 999px;
+  --shadow-sm: 0 1px 2px rgba(28,27,31,0.04), 0 1px 1px rgba(28,27,31,0.02);
+  --shadow-md: 0 4px 14px rgba(28,27,31,0.06), 0 1px 2px rgba(28,27,31,0.04);
+  --shadow-sheet: 0 -8px 32px rgba(28,27,31,0.12);
+  --font-sans: -apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro Display", "Inter Variable", "Inter", system-ui, "Helvetica Neue", Arial, sans-serif;
+
+  /* Warm Cream — Light (default) */
+  --bg-canvas: #F4F1EC; --bg-surface: #FAF7F2; --bg-elev: #FFFFFF; --bg-tinted: #ECE6DC;
+  --separator: rgba(60,60,67,0.14);
+  --ink: #1C1B1F; --ink-2: #43403A; --ink-3: #6F6B62; --ink-4: #A39E92;
+  --accent: #C8553D; --accent-soft: rgba(200,85,61,0.10);
+  --success: #2D7D46; --warn: #B45309; --danger: #C73E1D;
+}
+
+/* Warm Cream — Dark via class or [data-theme] */
+@media (prefers-color-scheme: dark) {
+  :root[data-theme="warm-cream"], :root:not([data-theme]) {
+    --bg-canvas: #0E0E10; --bg-surface: #18181B; --bg-elev: #1F1F23; --bg-tinted: #2A2A2F;
+    --ink: #F4F1EB; --ink-2: #C8C5BE; --ink-3: #93908A; --ink-4: #5E5C57;
+    --accent: #E07458;
+  }
+}
+
+/* Slate Cool */
+:root[data-theme="slate-cool"] {
+  --bg-canvas: #F1F2F5; --bg-surface: #FBFBFC; --bg-tinted: #E4E7EC;
+  --ink: #14171F; --accent: #4F46E5; --accent-soft: rgba(79,70,229,0.10);
+}
+@media (prefers-color-scheme: dark) {
+  :root[data-theme="slate-cool"] {
+    --bg-canvas: #0B0E14; --bg-surface: #15191F; --ink: #E8EBF0; --accent: #818CF8;
+  }
+}
+
+/* Forest Calm */
+:root[data-theme="forest-calm"] {
+  --bg-canvas: #F0F2EE; --bg-surface: #FAFBF7; --bg-tinted: #E0E5DA;
+  --ink: #1A1F1A; --accent: #4A6741; --accent-soft: rgba(74,103,65,0.10);
+}
+@media (prefers-color-scheme: dark) {
+  :root[data-theme="forest-calm"] {
+    --bg-canvas: #0E110E; --bg-surface: #181C18; --ink: #EDF1EA; --accent: #8FB07F;
+  }
+}
+
+/* Carbon Mono */
+:root[data-theme="carbon-mono"] {
+  --bg-canvas: #F6F6F4; --bg-surface: #FFFFFF; --bg-tinted: #ECECE9;
+  --ink: #0A0A0A; --accent: #0A0A0A; --accent-soft: rgba(10,10,10,0.06); --pr: #C73E1D;
+}
+@media (prefers-color-scheme: dark) {
+  :root[data-theme="carbon-mono"] {
+    --bg-canvas: #08080A; --bg-surface: #141417; --ink: #F5F5F0; --accent: #F5F5F0;
+  }
+}
+
+/* Type scale (DESIGN_SPEC §3.1) */
+.t-large    { font-size: 34px; line-height: 41px; font-weight: 700; letter-spacing: -0.025em; }
+.t-title-1  { font-size: 28px; line-height: 34px; font-weight: 700; letter-spacing: -0.022em; }
+.t-title-2  { font-size: 22px; line-height: 28px; font-weight: 600; letter-spacing: -0.018em; }
+.t-title-3  { font-size: 20px; line-height: 25px; font-weight: 600; letter-spacing: -0.014em; }
+.t-headline { font-size: 17px; line-height: 22px; font-weight: 600; letter-spacing: -0.012em; }
+.t-body     { font-size: 17px; line-height: 22px; font-weight: 400; letter-spacing: -0.008em; }
+.t-callout  { font-size: 16px; line-height: 21px; font-weight: 400; letter-spacing: -0.005em; }
+.t-subhead  { font-size: 15px; line-height: 20px; font-weight: 500; letter-spacing: -0.003em; }
+.t-footnote { font-size: 13px; line-height: 18px; font-weight: 400; }
+.t-caption  { font-size: 12px; line-height: 16px; font-weight: 500; }
+.t-display  { font-weight: 200; letter-spacing: -0.04em; }
+.tabular    { font-variant-numeric: tabular-nums; }
+
+html, body {
+  background: var(--bg-canvas); color: var(--ink); font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale;
+}
+* { box-sizing: border-box; }
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; }
+}
