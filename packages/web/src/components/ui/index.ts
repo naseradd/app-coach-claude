@@ -14,3 +14,8 @@ export type { SegmentedOption } from './Segmented.js';
 export { RPESegmented } from './RPESegmented.js';
 export { Stepper } from './Stepper.js';
 export { Toggle } from './Toggle.js';
+export { Sheet } from './Sheet.js';
+export { NavBar } from './NavBar.js';
+export { TabBar } from './TabBar.js';
+export type { TabId } from './TabBar.js';
+export { MediaThumb } from './MediaThumb.js';
