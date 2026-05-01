@@ -11,6 +11,7 @@ import { sessionsRoute } from './routes/sessions.js';
 import { setupRoute } from './routes/setup.js';
 import { dataRoute } from './routes/data.js';
 import { eventsRoute } from './routes/events.js';
+import { mountMcp } from './mcp/handler.js';
 
 const env = loadEnv();
 const db = openDb(env.DB_PATH);
@@ -28,6 +29,14 @@ api.route('/setup-status', setupRoute(db));
 api.route('/data', dataRoute(db));
 api.route('/events', eventsRoute);
 app.route('/api', api);
+
+// MCP transport — separate sub-app, same Bearer auth as /api.
+// Claude.ai connects here over Streamable HTTP (POST/GET/DELETE).
+const mcp = new Hono();
+mcp.use('*', bearerAuth(env.BEARER_TOKEN));
+mcp.all('/*', async (c) => mountMcp(c.req.raw, db));
+mcp.all('/', async (c) => mountMcp(c.req.raw, db));
+app.route('/mcp', mcp);
 
 serve({ fetch: app.fetch, port: env.PORT }, (info) => {
   console.log(`coach-claude server listening on :${info.port}`);
