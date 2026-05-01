@@ -36,20 +36,28 @@ flyctl secrets set BEARER_TOKEN="$NEW_TOKEN"
 # Update Claude project's MCP connector authorization with the new token
 ```
 
-## DB restore
+## DB backup & restore
+
+### Backup (recommended cadence: monthly)
 
 ```bash
-# Backup (manual, run monthly)
-flyctl ssh console -C "sqlite3 /data/coach.db '.backup /data/backup.db'"
-flyctl ssh sftp shell <<EOF
-get /data/backup.db ~/coach-backups/coach-$(date +%Y%m%d-%H%M%S).db
-EOF
+./scripts/backup-db.sh
+# Optional: override defaults
+COACH_BACKUP_DIR=/path/to/dir FLY_APP=coach-claude ./scripts/backup-db.sh
+```
 
-# Restore
-flyctl ssh sftp shell <<EOF
+The script uses `flyctl ssh console` to invoke `sqlite3 .backup` (a safe
+online snapshot — no app downtime), then SFTPs the file to
+`$COACH_BACKUP_DIR` (default `~/coach-backups/`). Files are timestamped
+`coach-YYYYMMDD-HHMMSS.db`.
+
+### Restore
+
+```bash
+flyctl ssh sftp shell -a coach-claude <<EOF
 put ~/coach-backups/coach-YYYYMMDD-HHMMSS.db /data/coach.db
 EOF
-flyctl machine restart
+flyctl machine restart -a coach-claude
 ```
 
 ## Logs
