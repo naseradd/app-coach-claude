@@ -64,6 +64,14 @@ flyctl status             # machines + volume + checks
 
 `fly.toml` has `auto_stop_machines = "stop"` and `min_machines_running = 0`. Idle machines sleep ~5 minutes; first request after wakes in ~1s. No action needed.
 
-## Claude project setup (Phase 9)
+## Claude.ai project setup (Phase 9)
 
-Documented separately when Phase 9 lands.
+1. Open https://claude.ai → Projects → New Project named "Coach Sportif"
+2. In project Instructions, paste the contents of `prompts/coach-instructions.md`
+3. Project Settings → Connectors → Add Custom MCP (HTTP)
+   - URL: `https://coach-claude.fly.dev/mcp`
+   - Authorization: `Bearer <BEARER_TOKEN>` (the same token you set with `flyctl secrets set BEARER_TOKEN=...`)
+4. Test the connector: in a new project chat, ask: "Lis mon profil avec read_profile". You should get either a profile or `null` (if you haven't set one).
+5. Configure your profile: "Configure mon profil avec update_profile: 30 ans, 78kg, 180cm, intermediate, équipement gym complète, pas de blessure, 1RM bench 100kg / squat 140kg / deadlift 180kg".
+6. Generate a program: "Génère une séance push lourde aujourd'hui." Claude should call `push_program`. You should see the program appear in the PWA Today screen within a second (via SSE).
+7. Run a workout. After submitting, ask Claude: "Résume ma dernière séance." Claude should call `read_history` and produce a summary.
