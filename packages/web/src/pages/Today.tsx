@@ -11,6 +11,7 @@ import {
   Sparkles,
 } from 'lucide-react';
 import { Badge, Button, Card, ProgressBar } from '../components/ui/index.js';
+import { IosInstallHint } from '../components/onboarding/IosInstallHint.js';
 import { useProgram } from '../store/program.store.js';
 import { useHistory } from '../store/history.store.js';
 import { useSettings } from '../store/settings.store.js';
@@ -132,6 +133,11 @@ export function Today() {
         animate="show"
         style={{ padding: '0 20px', display: 'grid', gap: 20 }}
       >
+        {/* iOS install hint (renders only on iOS Safari, dismissible) */}
+        <motion.div variants={itemVariants}>
+          <IosInstallHint />
+        </motion.div>
+
         {/* Active program card */}
         <motion.div variants={itemVariants}>
           <Card variant="mesh" padding={20}>
