@@ -11,6 +11,10 @@ interface ExerciseProgress {
   setsTotal: number;
 }
 
+export type SubmitOutcome =
+  | { ok: true; id: string }
+  | { ok: false; error: string };
+
 interface Props {
   session: SessionDef;
   exerciseProgress: ExerciseProgress[];
@@ -19,8 +23,10 @@ interface Props {
   totalSetsDone: number;
   totalRepsDone: number;
   prCount: number;
-  onSubmit?: () => void;
+  /** Workout-level submit handler that POSTs and returns the saved id. */
+  onSubmitReport?: (overallFeeling: number, notes: string) => Promise<SubmitOutcome>;
   onBack?: () => void;
+  onNavigateToReport?: (id: string) => void;
 }
 
 const FEELINGS = ['😩', '😕', '😐', '🙂', '🤩'] as const;
@@ -33,23 +39,34 @@ export function PostSession({
   totalSetsDone,
   totalRepsDone,
   prCount,
-  onSubmit,
+  onSubmitReport,
   onBack,
+  onNavigateToReport,
 }: Props) {
   const navigate = useNavigate();
-  const [feeling, setFeeling] = useState<number | null>(3);
+  const [feeling, setFeeling] = useState<number>(3);
   const [notes, setNotes] = useState('');
-  const [submitted, setSubmitted] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
+  const [submittedId, setSubmittedId] = useState<string | null>(null);
+  const [submitError, setSubmitError] = useState<string | null>(null);
 
   const totalSetsPlanned = exerciseProgress.reduce((acc, e) => acc + e.setsTotal, 0);
   const completionRate = totalSetsPlanned > 0 ? totalSetsDone / totalSetsPlanned : 0;
 
-  const handleSubmit = () => {
-    setSubmitted(true);
-    onSubmit?.();
+  const handleSubmit = async () => {
+    if (!onSubmitReport) {
+      setSubmittedId('mock');
+      return;
+    }
+    setSubmitting(true);
+    setSubmitError(null);
+    const out = await onSubmitReport(feeling, notes);
+    setSubmitting(false);
+    if (out.ok) setSubmittedId(out.id);
+    else setSubmitError(out.error);
   };
 
-  if (submitted) {
+  if (submittedId) {
     return (
       <div
         style={{
@@ -86,15 +103,36 @@ export function PostSession({
         <p className="t-callout" style={{ color: 'var(--ink-2)', marginTop: 8, maxWidth: 320 }}>
           Le rapport a été envoyé. Claude pourra le lire à ton prochain prompt.
         </p>
-        <div style={{ marginTop: 32, width: '100%', maxWidth: 320 }}>
-          <Button
-            variant="primary"
-            size="lg"
-            fullWidth
-            onClick={() => (onBack ? onBack() : navigate('/'))}
-          >
-            Retour
-          </Button>
+        <div style={{ marginTop: 32, width: '100%', maxWidth: 320, display: 'grid', gap: 10 }}>
+          {onNavigateToReport && submittedId !== 'mock' ? (
+            <Button
+              variant="primary"
+              size="lg"
+              fullWidth
+              onClick={() => onNavigateToReport(submittedId)}
+            >
+              Voir le rapport
+            </Button>
+          ) : (
+            <Button
+              variant="primary"
+              size="lg"
+              fullWidth
+              onClick={() => (onBack ? onBack() : navigate('/'))}
+            >
+              Retour
+            </Button>
+          )}
+          {onNavigateToReport && submittedId !== 'mock' ? (
+            <Button
+              variant="plain"
+              size="md"
+              fullWidth
+              onClick={() => (onBack ? onBack() : navigate('/'))}
+            >
+              Retour à l'accueil
+            </Button>
+          ) : null}
         </div>
       </div>
     );
@@ -113,7 +151,6 @@ export function PostSession({
       </header>
 
       <div style={{ padding: '0 20px', display: 'grid', gap: 16 }}>
-        {/* Stats grid 2×2 */}
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
           <StatTile label="Durée" value={`${durationMinutes}min`} />
           <StatTile label="Volume" value={`${Math.round(totalVolumeKg)}kg`} />
@@ -121,9 +158,15 @@ export function PostSession({
           <StatTile label="Reps" value={`${totalRepsDone}`} />
         </div>
 
-        {/* Completion */}
         <Card variant="surface" padding={16}>
-          <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', marginBottom: 8 }}>
+          <div
+            style={{
+              display: 'flex',
+              alignItems: 'baseline',
+              justifyContent: 'space-between',
+              marginBottom: 8,
+            }}
+          >
             <span className="t-headline" style={{ color: 'var(--ink)' }}>
               Complétion
             </span>
@@ -134,7 +177,6 @@ export function PostSession({
           <ProgressBar value={completionRate} />
         </Card>
 
-        {/* PR card */}
         {prCount > 0 ? (
           <motion.div
             initial={{ scale: 0.9, opacity: 0 }}
@@ -170,7 +212,6 @@ export function PostSession({
           </motion.div>
         ) : null}
 
-        {/* Feeling */}
         <Card variant="surface" padding={16}>
           <div className="t-subhead" style={{ color: 'var(--ink-3)', marginBottom: 10 }}>
             Comment tu te sens ?
@@ -205,7 +246,6 @@ export function PostSession({
           </div>
         </Card>
 
-        {/* Notes */}
         <Card variant="surface" padding={16}>
           <div className="t-subhead" style={{ color: 'var(--ink-3)', marginBottom: 8 }}>
             Notes
@@ -230,7 +270,6 @@ export function PostSession({
           />
         </Card>
 
-        {/* Exercises completion list */}
         <ListGroup header="exercices">
           {exerciseProgress.map((ep) => {
             const pct = ep.setsTotal > 0 ? ep.setsDone / ep.setsTotal : 0;
@@ -258,9 +297,16 @@ export function PostSession({
             );
           })}
         </ListGroup>
+
+        {submitError ? (
+          <Card variant="tinted" padding={14}>
+            <div className="t-footnote" style={{ color: 'var(--danger)' }}>
+              Envoi impossible : {submitError}
+            </div>
+          </Card>
+        ) : null}
       </div>
 
-      {/* Sticky bottom CTA */}
       <div
         style={{
           position: 'fixed',
@@ -283,8 +329,9 @@ export function PostSession({
           fullWidth
           leadingIcon={<Send size={18} />}
           onClick={handleSubmit}
+          disabled={submitting}
         >
-          Envoyer le rapport
+          {submitting ? 'Envoi…' : 'Envoyer le rapport'}
         </Button>
       </div>
     </div>

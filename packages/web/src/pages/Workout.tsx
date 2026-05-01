@@ -21,10 +21,13 @@ import {
   Sheet,
   Stepper,
 } from '../components/ui/index.js';
-import { mockProgram } from '../mocks/index.js';
-import type { Exercise, WorkSet } from '@coach/shared';
+import type { Exercise, SessionDef, WorkSet, SessionReport } from '@coach/shared';
 import { RestTimer } from './RestTimer.js';
 import { PostSession } from './PostSession.js';
+import { useProgram } from '../store/program.store.js';
+import { useHistory } from '../store/history.store.js';
+import { useWorkout } from '../store/workout.store.js';
+import { apiClient } from '../api/endpoints.js';
 
 type Phase = 'set' | 'rest' | 'done';
 
@@ -37,11 +40,56 @@ interface SetActuals {
 export function Workout() {
   const [params] = useSearchParams();
   const navigate = useNavigate();
-  const sessionId = params.get('session') ?? mockProgram.sessions[0]!.id;
-  const session = useMemo(
-    () => mockProgram.sessions.find((s) => s.id === sessionId) ?? mockProgram.sessions[0]!,
-    [sessionId],
-  );
+  const program = useProgram((s) => s.program);
+  const sessionId = params.get('session');
+
+  const session = useMemo<SessionDef | null>(() => {
+    if (!program) return null;
+    if (sessionId) {
+      return program.sessions.find((s) => s.id === sessionId) ?? null;
+    }
+    return program.sessions[0] ?? null;
+  }, [program, sessionId]);
+
+  if (!program || !session) {
+    return (
+      <div
+        style={{
+          minHeight: '100dvh',
+          display: 'grid',
+          placeItems: 'center',
+          padding: 32,
+          textAlign: 'center',
+        }}
+      >
+        <div>
+          <p className="t-body" style={{ color: 'var(--ink-3)' }}>
+            {program === null ? 'Aucun programme actif' : 'Séance introuvable'}
+          </p>
+          <div style={{ marginTop: 16 }}>
+            <Button variant="primary" size="md" onClick={() => navigate('/')}>
+              Retour
+            </Button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  return <WorkoutInner program={program} session={session} />;
+}
+
+interface InnerProps {
+  program: NonNullable<ReturnType<typeof useProgram.getState>['program']>;
+  session: SessionDef;
+}
+
+function WorkoutInner({ program, session }: InnerProps) {
+  const navigate = useNavigate();
+  const upsertReport = useHistory((s) => s.upsert);
+  const startWorkout = useWorkout((s) => s.start);
+  const setWorkoutPhase = useWorkout((s) => s.setPhase);
+  const endWorkout = useWorkout((s) => s.end);
 
   // Flat list of (exercise, set)
   const flatPlan = useMemo(() => {
@@ -64,13 +112,30 @@ export function Workout() {
   const totalExercises = exercisesFlat.length;
 
   const [phase, setPhase] = useState<Phase>('set');
-  const [cursor, setCursor] = useState(0); // index in flatPlan
+  const [cursor, setCursor] = useState(0);
   const [actuals, setActuals] = useState<Record<string, SetActuals>>({});
   const [cuesOpen, setCuesOpen] = useState(false);
   const [moreOpen, setMoreOpen] = useState(false);
   const [closeOpen, setCloseOpen] = useState(false);
   const [globalSeconds, setGlobalSeconds] = useState(0);
   const [startedAt] = useState(() => new Date());
+
+  // Mark workout active in the store the moment this view mounts.
+  // Phase 8 will use this for crash recovery.
+  useEffect(() => {
+    startWorkout(session.id);
+    return () => {
+      // Only end if we left without completion. PostSession's submit handler
+      // also clears it after a successful POST.
+      const active = useWorkout.getState().active;
+      if (active && active.sessionId === session.id) endWorkout();
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [session.id]);
+
+  useEffect(() => {
+    setWorkoutPhase(phase);
+  }, [phase, setWorkoutPhase]);
 
   // Global timer
   useEffect(() => {
@@ -86,7 +151,6 @@ export function Workout() {
     ? exercisesFlat.findIndex((e) => e.id === currentItem.exercise.id) + 1
     : 0;
 
-  // Init form when set changes
   const formKey = currentItem ? `${currentItem.exercise.id}-${currentItem.setIndex}` : '';
   const stored = actuals[formKey];
   const initialReps = stored?.reps ?? currentItem?.set.reps ?? currentItem?.set.reps_min ?? 8;
@@ -104,10 +168,7 @@ export function Workout() {
 
   const validateSet = () => {
     if (!currentItem) return;
-    setActuals((prev) => ({
-      ...prev,
-      [formKey]: { reps, weight, rpe },
-    }));
+    setActuals((prev) => ({ ...prev, [formKey]: { reps, weight, rpe } }));
     if (cursor + 1 >= flatPlan.length) {
       setPhase('done');
       return;
@@ -130,7 +191,7 @@ export function Workout() {
     return `${m}:${String(sec).padStart(2, '0')}`;
   };
 
-  // Done phase
+  // Done phase — build a real SessionReport and POST.
   if (phase === 'done') {
     const exerciseProgress = exercisesFlat.map((ex) => {
       const setsTotal = ex.sets.length;
@@ -141,6 +202,31 @@ export function Workout() {
     const totalSetsDone = Object.keys(actuals).length;
     const totalRepsDone = Object.values(actuals).reduce((acc, a) => acc + a.reps, 0);
     const durationMinutes = Math.max(1, Math.round((Date.now() - startedAt.getTime()) / 60000));
+
+    const handleSubmit = async (overallFeeling: number, notes: string) => {
+      const report = buildReport({
+        program,
+        session,
+        startedAt,
+        durationMinutes,
+        actuals,
+        flatPlan,
+        overallFeeling,
+        notes,
+      });
+      try {
+        const saved = await apiClient.postSession(report);
+        upsertReport(saved);
+        endWorkout();
+        return { ok: true as const, id: saved.id };
+      } catch (e) {
+        return {
+          ok: false as const,
+          error: e instanceof Error ? e.message : 'submit_failed',
+        };
+      }
+    };
+
     return (
       <PostSession
         session={session}
@@ -149,18 +235,15 @@ export function Workout() {
         totalVolumeKg={totalVolumeKg}
         totalSetsDone={totalSetsDone}
         totalRepsDone={totalRepsDone}
-        prCount={1}
-        onSubmit={() => {
-          /* Phase 7: real POST */
-        }}
+        prCount={0}
+        onSubmitReport={handleSubmit}
         onBack={() => navigate('/')}
+        onNavigateToReport={(id) => navigate(`/history/${id}`)}
       />
     );
   }
 
-  if (!currentItem) {
-    return null;
-  }
+  if (!currentItem) return null;
 
   const exercise = currentItem.exercise;
   const set = currentItem.set;
@@ -168,8 +251,8 @@ export function Workout() {
   const totalSetsInExercise = exercise.sets.length;
   const setProgressOverall = (cursor + 1) / totalSets;
 
-  // PR projection mock: if reps & weight both above any historical, PR
-  const pr = weight > (set.weight_kg ?? 0) || (reps > (set.reps ?? 0) && weight >= (set.weight_kg ?? 0));
+  const pr =
+    weight > (set.weight_kg ?? 0) || (reps > (set.reps ?? 0) && weight >= (set.weight_kg ?? 0));
 
   return (
     <div style={{ minHeight: '100dvh', background: 'var(--bg-canvas)' }}>
@@ -215,12 +298,7 @@ export function Workout() {
           <ProgressBar value={setProgressOverall} ariaLabel="progression sets" />
           <div
             className="t-caption tabular"
-            style={{
-              color: 'var(--ink-3)',
-              display: 'flex',
-              justifyContent: 'space-between',
-              marginTop: 4,
-            }}
+            style={{ color: 'var(--ink-3)', display: 'flex', justifyContent: 'space-between', marginTop: 4 }}
           >
             <span>
               Exo {exerciseIdx}/{totalExercises}
@@ -418,7 +496,7 @@ export function Workout() {
         onSkip={completeRest}
         onComplete={completeRest}
         onAdd30={() => {
-          /* RestTimer manages its own state — phase 8 wires this */
+          /* Phase 8 wires this */
         }}
       />
 
@@ -476,6 +554,7 @@ export function Workout() {
               fullWidth
               onClick={() => {
                 setCloseOpen(false);
+                endWorkout();
                 navigate('/');
               }}
             >
@@ -489,4 +568,129 @@ export function Workout() {
       </Sheet>
     </div>
   );
+}
+
+interface BuildReportInput {
+  program: NonNullable<ReturnType<typeof useProgram.getState>['program']>;
+  session: SessionDef;
+  startedAt: Date;
+  durationMinutes: number;
+  actuals: Record<string, SetActuals>;
+  flatPlan: { exercise: Exercise; setIndex: number; set: WorkSet }[];
+  overallFeeling: number;
+  notes: string;
+}
+
+/**
+ * Convert in-memory `actuals` map into the canonical SessionReport shape
+ * accepted by POST /api/sessions. Phase 8 will replace the random UUID
+ * with a stable id and add real PR detection from history.
+ */
+function buildReport(input: BuildReportInput): SessionReport {
+  const { program, session, startedAt, durationMinutes, actuals, flatPlan, overallFeeling, notes } =
+    input;
+  const completedAt = new Date().toISOString();
+
+  // Group flatPlan by exercise to build exercises_log.
+  const byExercise = new Map<string, { exercise: Exercise; entries: typeof flatPlan }>();
+  for (const item of flatPlan) {
+    const key = item.exercise.id;
+    if (!byExercise.has(key)) byExercise.set(key, { exercise: item.exercise, entries: [] });
+    byExercise.get(key)!.entries.push(item);
+  }
+
+  let totalSetsPlanned = 0;
+  let totalSetsDone = 0;
+  let totalRepsDone = 0;
+  let totalVolumeKg = 0;
+
+  const exercises_log = Array.from(byExercise.values()).map(({ exercise, entries }) => {
+    const sets_log = entries.map(({ set, setIndex }) => {
+      const a = actuals[`${exercise.id}-${setIndex}`];
+      totalSetsPlanned += 1;
+      const completed = Boolean(a);
+      if (completed) {
+        totalSetsDone += 1;
+        totalRepsDone += a!.reps;
+        totalVolumeKg += a!.reps * a!.weight;
+      }
+      return {
+        set_number: set.set_number,
+        type: set.type,
+        planned_reps: set.reps,
+        actual_reps: a?.reps ?? null,
+        planned_weight_kg: set.weight_kg,
+        actual_weight_kg: a?.weight ?? null,
+        rpe_planned: set.rpe_target,
+        rpe_actual: (a?.rpe ?? null) as number | null,
+        rest_planned_seconds: set.rest_seconds,
+        rest_taken_seconds: set.rest_seconds, // Phase 8: capture real rest taken
+        duration_seconds: set.duration_seconds,
+        completed,
+        is_pr: false,
+        notes: '',
+      };
+    });
+    const allDone = sets_log.every((s) => s.completed);
+    return {
+      exercise_id: exercise.id,
+      exercise_name: exercise.name,
+      completed: allDone,
+      skipped: sets_log.every((s) => !s.completed),
+      sets_log,
+      notes: '',
+    };
+  });
+
+  const completion_rate = totalSetsPlanned > 0 ? totalSetsDone / totalSetsPlanned : 0;
+
+  return {
+    schema_version: '1.0.0',
+    id: cryptoRandomUuidV4(),
+    program_id: program.program.id,
+    session_id: session.id,
+    session_name: session.name,
+    started_at: startedAt.toISOString(),
+    completed_at: completedAt,
+    duration_actual_minutes: durationMinutes,
+    completion_rate,
+    pre_session: {
+      energy_level: null,
+      sleep_quality: null,
+      soreness_level: null,
+      notes: '',
+    },
+    post_session: {
+      overall_feeling: Math.max(1, Math.min(5, overallFeeling)),
+      difficulty_perceived: null,
+      notes,
+    },
+    exercises_log,
+    volume_summary: {
+      total_sets_planned: totalSetsPlanned,
+      total_sets_done: totalSetsDone,
+      total_reps_done: totalRepsDone,
+      total_volume_kg: Math.round(totalVolumeKg * 10) / 10,
+    },
+  };
+}
+
+/**
+ * `crypto.randomUUID` is widely available; this small helper keeps the
+ * call-site readable and isolates the typing for older type lib targets.
+ */
+function cryptoRandomUuidV4(): string {
+  if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
+    return crypto.randomUUID();
+  }
+  // Fallback (very unlikely path on modern browsers).
+  const hex = '0123456789abcdef';
+  let s = '';
+  for (let i = 0; i < 36; i++) {
+    if (i === 8 || i === 13 || i === 18 || i === 23) s += '-';
+    else if (i === 14) s += '4';
+    else if (i === 19) s += hex[8 + Math.floor(Math.random() * 4)];
+    else s += hex[Math.floor(Math.random() * 16)];
+  }
+  return s;
 }
