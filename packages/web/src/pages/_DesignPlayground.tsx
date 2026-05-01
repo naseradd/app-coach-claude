@@ -1,7 +1,15 @@
 import { useState } from 'react';
-import { Heart, ArrowRight, Plus, Video } from 'lucide-react';
+import { Heart, ArrowRight, Plus, Video, Dumbbell, Bell, User } from 'lucide-react';
 import { applyTheme, THEMES, type ThemeId, loadTheme } from '../design/themes.js';
-import { Badge, Button, IconButton, ProgressBar } from '../components/ui/index.js';
+import {
+  Badge,
+  Button,
+  Card,
+  IconButton,
+  ListGroup,
+  ListRow,
+  ProgressBar,
+} from '../components/ui/index.js';
 
 export function DesignPlayground() {
   const [theme, setTheme] = useState<ThemeId>(loadTheme());
@@ -82,6 +90,70 @@ export function DesignPlayground() {
             <Button size="sm" variant="bordered" onClick={() => setProgress((v) => Math.min(1, v + 0.1))}>+10%</Button>
           </div>
         </div>
+      </Section>
+
+      <Section title="Card — variants">
+        <div style={{ display: 'grid', gap: 12 }}>
+          <Card variant="surface">
+            <div className="t-headline">Surface</div>
+            <div className="t-footnote" style={{ color: 'var(--ink-3)' }}>
+              Card par défaut, fond bg-surface.
+            </div>
+          </Card>
+          <Card variant="elev">
+            <div className="t-headline">Élevée</div>
+            <div className="t-footnote" style={{ color: 'var(--ink-3)' }}>
+              Shadow plus prononcée.
+            </div>
+          </Card>
+          <Card variant="tinted">
+            <div className="t-headline">Tinted</div>
+            <div className="t-footnote" style={{ color: 'var(--ink-3)' }}>
+              Fond bg-tinted, accent doux.
+            </div>
+          </Card>
+          <Card variant="outlined">
+            <div className="t-headline">Outlined</div>
+            <div className="t-footnote" style={{ color: 'var(--ink-3)' }}>
+              Bordure 1px separator.
+            </div>
+          </Card>
+          <Card variant="mesh" padding={20}>
+            <Badge variant="accent">Programme actif</Badge>
+            <div className="t-title-1" style={{ marginTop: 8 }}>Force & hypertrophie</div>
+            <div className="t-callout" style={{ color: 'var(--ink-3)', marginTop: 4 }}>
+              Bloc 1 · semaine 4
+            </div>
+          </Card>
+        </div>
+      </Section>
+
+      <Section title="ListGroup + ListRow">
+        <ListGroup header="paramètres">
+          <ListRow
+            leading={<Bell size={18} style={{ color: 'var(--ink-2)' }} />}
+            label="Notifications"
+            subtitle="Rappels de séance"
+            trailing="Activé"
+            showChevron
+            onClick={() => undefined}
+          />
+          <ListRow
+            leading={<User size={18} style={{ color: 'var(--ink-2)' }} />}
+            label="Profil"
+            subtitle="Dany · 30 ans"
+            showChevron
+            onClick={() => undefined}
+          />
+          <ListRow
+            leading={<Dumbbell size={18} style={{ color: 'var(--ink-2)' }} />}
+            label="Programme"
+            subtitle="Force & hypertrophie · 4 séances"
+            trailing="Actif"
+            showChevron
+            onClick={() => undefined}
+          />
+        </ListGroup>
       </Section>
     </div>
   );
