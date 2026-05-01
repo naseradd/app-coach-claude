@@ -8,11 +8,16 @@ import {
   IconButton,
   ListGroup,
   ListRow,
+  MediaThumb,
+  NavBar,
   ProgressBar,
   Segmented,
   RPESegmented,
+  Sheet,
   Stepper,
+  TabBar,
   Toggle,
+  type TabId,
 } from '../components/ui/index.js';
 
 export function DesignPlayground() {
@@ -24,6 +29,9 @@ export function DesignPlayground() {
   const [rpe, setRpe] = useState(7);
   const [notif, setNotif] = useState(true);
   const [haptic, setHaptic] = useState(false);
+  const [sheetOpen, setSheetOpen] = useState(false);
+  const [sheetLargeOpen, setSheetLargeOpen] = useState(false);
+  const [tab, setTab] = useState<TabId>('coach');
 
   const setT = (t: ThemeId) => {
     setTheme(t);
@@ -31,11 +39,18 @@ export function DesignPlayground() {
   };
 
   return (
-    <div style={{ maxWidth: 430, margin: '0 auto', padding: 20, paddingBottom: 120 }}>
-      <h1 className="t-large" style={{ margin: '8px 0 4px' }}>Design playground</h1>
-      <p className="t-callout" style={{ color: 'var(--ink-3)', margin: '0 0 24px' }}>
-        Tous les primitives, en vie.
-      </p>
+    <>
+      <div style={{ maxWidth: 430, margin: '0 auto', minHeight: '100vh' }}>
+        <NavBar
+          title="Playground"
+          subtitle="Tous les primitives, en vie."
+          trailing={
+            <IconButton ariaLabel="Vidéo" variant="tinted">
+              <Video size={18} />
+            </IconButton>
+          }
+        />
+        <div style={{ padding: '0 20px 120px' }}>
 
       <Section title="Thème">
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
@@ -215,7 +230,67 @@ export function DesignPlayground() {
           />
         </ListGroup>
       </Section>
-    </div>
+
+      <Section title="MediaThumb">
+        <div style={{ display: 'grid', gap: 12 }}>
+          <MediaThumb
+            src="https://images.unsplash.com/photo-1581009146145-b5ef050c2e1e?auto=format&fit=crop&w=800&q=60"
+            alt="Démo bench press"
+          />
+          <MediaThumb src={null} alt="Pas de média" />
+        </div>
+      </Section>
+
+      <Section title="Sheet">
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+          <Button variant="tinted" onClick={() => setSheetOpen(true)}>
+            Ouvrir sheet medium
+          </Button>
+          <Button variant="bordered" onClick={() => setSheetLargeOpen(true)}>
+            Ouvrir sheet large
+          </Button>
+        </div>
+      </Section>
+
+      <Section title="NavBar + TabBar">
+        <Card variant="tinted">
+          <div className="t-callout" style={{ color: 'var(--ink-3)' }}>
+            Scroll pour voir la NavBar collapse en compact (top de la page).
+            La TabBar est fixée en bas — onglet actif :{' '}
+            <span style={{ color: 'var(--accent)', fontWeight: 600 }}>{tab}</span>.
+          </div>
+        </Card>
+      </Section>
+
+        </div>
+      </div>
+
+      <Sheet open={sheetOpen} onClose={() => setSheetOpen(false)} detent="medium">
+        <h3 className="t-title-3" style={{ margin: '0 0 12px' }}>Sheet medium</h3>
+        <p className="t-callout" style={{ color: 'var(--ink-3)' }}>
+          Drag vers le bas ou tap sur le scrim pour fermer. ESC marche aussi.
+        </p>
+        <div style={{ marginTop: 16 }}>
+          <Button fullWidth onClick={() => setSheetOpen(false)}>Fermer</Button>
+        </div>
+      </Sheet>
+
+      <Sheet open={sheetLargeOpen} onClose={() => setSheetLargeOpen(false)} detent="large">
+        <h3 className="t-title-3" style={{ margin: '0 0 12px' }}>Sheet large</h3>
+        <MediaThumb
+          src="https://images.unsplash.com/photo-1581009146145-b5ef050c2e1e?auto=format&fit=crop&w=800&q=60"
+          alt="Démo"
+        />
+        <p className="t-callout" style={{ color: 'var(--ink-3)', marginTop: 12 }}>
+          Detent large = 86vh. Idéal pour player vidéo + cues.
+        </p>
+        <div style={{ marginTop: 16 }}>
+          <Button fullWidth variant="tinted" onClick={() => setSheetLargeOpen(false)}>Fermer</Button>
+        </div>
+      </Sheet>
+
+      <TabBar active={tab} onChange={setTab} />
+    </>
   );
 }
 
