@@ -29,7 +29,7 @@ export function ListRow({
     <Comp
       type={onClick ? 'button' : undefined}
       onClick={onClick}
-      whileTap={interactive ? { backgroundColor: 'rgba(28,27,31,0.06)' } : undefined}
+      whileTap={interactive ? { backgroundColor: 'var(--row-press)' } : undefined}
       transition={spring.tap}
       className={className}
       style={{

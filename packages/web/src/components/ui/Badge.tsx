@@ -9,12 +9,12 @@ interface Props {
 }
 
 const palette: Record<BadgeVariant, { bg: string; fg: string }> = {
-  accent:  { bg: 'var(--accent-soft)',           fg: 'var(--accent)' },
-  neutral: { bg: 'var(--bg-tinted)',             fg: 'var(--ink-2)' },
-  success: { bg: 'rgba(45,125,70,0.12)',         fg: 'var(--success)' },
-  warn:    { bg: 'rgba(180,83,9,0.12)',          fg: 'var(--warn)' },
-  danger:  { bg: 'rgba(199,62,29,0.12)',         fg: 'var(--danger)' },
-  pr:      { bg: 'rgba(199,62,29,0.14)',         fg: 'var(--danger)' },
+  accent:  { bg: 'var(--accent-soft)',  fg: 'var(--accent)' },
+  neutral: { bg: 'var(--bg-tinted)',    fg: 'var(--ink-2)' },
+  success: { bg: 'var(--success-soft)', fg: 'var(--success)' },
+  warn:    { bg: 'var(--warn-soft)',    fg: 'var(--warn)' },
+  danger:  { bg: 'var(--danger-soft)',  fg: 'var(--danger)' },
+  pr:      { bg: 'var(--pr-soft)',      fg: 'var(--pr, var(--danger))' },
 };
 
 export function Badge({ variant = 'neutral', children, className }: Props) {

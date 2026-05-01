@@ -1,22 +1,36 @@
 import { motion } from 'motion/react';
-import { Dumbbell, Archive, User } from 'lucide-react';
+import { Dumbbell, Archive, User, type LucideIcon } from 'lucide-react';
 import { spring } from '../../design/motion.js';
 
 export type TabId = 'coach' | 'archives' | 'profile';
 
-interface Props {
-  active: TabId;
-  onChange: (id: TabId) => void;
+export interface TabConfig<Id extends string = string> {
+  id: Id;
+  label: string;
+  icon: LucideIcon;
+  iconActive?: LucideIcon;
+}
+
+interface Props<Id extends string = TabId> {
+  active: Id;
+  onChange: (id: Id) => void;
+  tabs?: TabConfig<Id>[];
   className?: string;
 }
 
-const TABS: { id: TabId; label: string; Icon: typeof Dumbbell }[] = [
-  { id: 'coach',    label: 'Coach',    Icon: Dumbbell },
-  { id: 'archives', label: 'Archives', Icon: Archive },
-  { id: 'profile',  label: 'Profil',   Icon: User },
+const DEFAULT_TABS: TabConfig<TabId>[] = [
+  { id: 'coach',    label: 'Coach',    icon: Dumbbell },
+  { id: 'archives', label: 'Archives', icon: Archive },
+  { id: 'profile',  label: 'Profil',   icon: User },
 ];
 
-export function TabBar({ active, onChange, className }: Props) {
+export function TabBar<Id extends string = TabId>({
+  active,
+  onChange,
+  tabs,
+  className,
+}: Props<Id>) {
+  const items = (tabs ?? (DEFAULT_TABS as unknown as TabConfig<Id>[]));
   return (
     <nav
       role="tablist"
@@ -27,7 +41,7 @@ export function TabBar({ active, onChange, className }: Props) {
         right: 0,
         bottom: 0,
         zIndex: 60,
-        background: 'rgba(250,247,242,0.78)',
+        background: 'var(--material)',
         backdropFilter: 'blur(24px) saturate(180%)',
         WebkitBackdropFilter: 'blur(24px) saturate(180%)',
         borderTop: '1px solid var(--separator)',
@@ -35,8 +49,9 @@ export function TabBar({ active, onChange, className }: Props) {
       }}
     >
       <div style={{ maxWidth: 430, margin: '0 auto', display: 'flex', height: 56 }}>
-        {TABS.map(({ id, label, Icon }) => {
+        {items.map(({ id, label, icon: Icon, iconActive: IconActive }) => {
           const isActive = id === active;
+          const RenderedIcon = isActive && IconActive ? IconActive : Icon;
           return (
             <motion.button
               key={id}
@@ -66,10 +81,10 @@ export function TabBar({ active, onChange, className }: Props) {
                 transition={spring.default}
                 style={{ display: 'inline-flex' }}
               >
-                <Icon
+                <RenderedIcon
                   size={22}
                   strokeWidth={isActive ? 2.4 : 1.8}
-                  fill={isActive ? 'currentColor' : 'none'}
+                  fill={isActive && !IconActive ? 'currentColor' : 'none'}
                 />
               </motion.span>
               <span style={{ fontSize: 12, fontWeight: 500, lineHeight: '14px' }}>{label}</span>

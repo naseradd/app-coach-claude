@@ -17,6 +17,15 @@ export function Sheet({ open, onClose, children, detent = 'medium' }: Props) {
     return () => document.removeEventListener('keydown', onKey);
   }, [open, onClose]);
 
+  useEffect(() => {
+    if (!open) return;
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    return () => {
+      document.body.style.overflow = previousOverflow;
+    };
+  }, [open]);
+
   const height = detent === 'large' ? '86vh' : '50vh';
 
   return (

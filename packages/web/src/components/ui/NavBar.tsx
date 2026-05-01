@@ -37,7 +37,7 @@ export function NavBar({
         top: 0,
         zIndex: 50,
         paddingTop: 'env(safe-area-inset-top)',
-        background: scrolled ? 'rgba(250,247,242,0.78)' : 'transparent',
+        background: scrolled ? 'var(--material)' : 'transparent',
         backdropFilter: scrolled ? 'blur(24px) saturate(180%)' : 'none',
         WebkitBackdropFilter: scrolled ? 'blur(24px) saturate(180%)' : 'none',
         borderBottom: scrolled ? '1px solid var(--separator)' : '1px solid transparent',
