@@ -12,6 +12,7 @@ import { setupRoute } from './routes/setup.js';
 import { dataRoute } from './routes/data.js';
 import { eventsRoute } from './routes/events.js';
 import { mountMcp } from './mcp/handler.js';
+import { staticRoute } from './routes/static.js';
 
 const env = loadEnv();
 const db = openDb(env.DB_PATH);
@@ -36,6 +37,9 @@ const mcp = new Hono();
 mcp.use('*', bearerAuth(env.BEARER_TOKEN));
 mcp.all('/*', async (c) => mountMcp(c.req.raw, db));
 app.route('/mcp', mcp);
+
+// Static PWA — must be mounted LAST so SPA fallback doesn't shadow API/MCP routes.
+app.route('/', staticRoute(env.STATIC_DIR));
 
 serve({ fetch: app.fetch, port: env.PORT }, (info) => {
   console.log(`coach-claude server listening on :${info.port}`);
