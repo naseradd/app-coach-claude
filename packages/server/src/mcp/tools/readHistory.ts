@@ -18,8 +18,8 @@ export const readHistory = {
         type: 'integer',
         minimum: 1,
         maximum: MAX_LIMIT,
-        default: 30,
-        description: `Max number of reports to return (1-${MAX_LIMIT}, default 30).`,
+        default: 50,
+        description: `Max number of reports to return (1-${MAX_LIMIT}, default 50).`,
       },
       offset: {
         type: 'integer',
@@ -34,7 +34,7 @@ export const readHistory = {
     (db: DB) =>
     async (args: unknown): Promise<ToolResult> => {
       const a = (args ?? {}) as { limit?: unknown; offset?: unknown };
-      const limit = a.limit === undefined ? 30 : Number(a.limit);
+      const limit = a.limit === undefined ? 50 : Number(a.limit);
       const offset = a.offset === undefined ? 0 : Number(a.offset);
       if (!Number.isInteger(limit) || limit < 1 || limit > MAX_LIMIT) {
         return {

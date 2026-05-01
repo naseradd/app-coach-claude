@@ -10,7 +10,7 @@ type ToolResult =
 export const updateProfile = {
   name: 'update_profile',
   description:
-    "Replace the user's fitness profile with a new UserProfile object. Server stamps `updated_at` automatically. Use after onboarding or when the user reports a bodyweight/1RM/goal/equipment change. Validation is strict — pass a complete UserProfile.",
+    "Replace the user's fitness profile with a new UserProfile object. The profile object must include schema_version: \"1.0.0\". Server stamps `updated_at` automatically. Use after onboarding or when the user reports a bodyweight/1RM/goal/equipment change. Validation is strict — pass a complete UserProfile.",
   inputSchema: {
     type: 'object' as const,
     properties: {

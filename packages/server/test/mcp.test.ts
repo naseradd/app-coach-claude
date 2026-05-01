@@ -8,6 +8,7 @@ import { readActiveProgram } from '../src/mcp/tools/readActiveProgram.js';
 import { pushProgram } from '../src/mcp/tools/pushProgram.js';
 import { readHistory } from '../src/mcp/tools/readHistory.js';
 import { readAggregateStats } from '../src/mcp/tools/readAggregateStats.js';
+import { eventBus } from '../src/events/bus.js';
 
 const sampleProfile = {
   schema_version: '1.0.0',
@@ -98,5 +99,109 @@ describe('mcp', () => {
     const res = await readAggregateStats.handler(db)({});
     const stats = JSON.parse(res.content[0].text);
     expect(stats.sessions_total).toBe(0);
+  });
+});
+
+describe('mcp event publication', () => {
+  it('update_profile publishes profile_updated', async () => {
+    const db = openDb(':memory:');
+    runMigrations(db);
+    const events: any[] = [];
+    const unsub = eventBus.subscribe((ev) => events.push(ev));
+    try {
+      const handler = updateProfile.handler(db);
+      const profile = {
+        schema_version: '1.0.0',
+        display_name: 'Dany',
+        age: 30,
+        height_cm: 180,
+        weight_kg: 78,
+        experience_level: 'intermediate',
+        goals: ['strength'],
+        equipment: ['barbell'],
+        injuries: [],
+        one_rep_max_kg: { bench: 100 },
+        weight_unit_preference: 'kg',
+      };
+      const res = await handler({ profile });
+      expect('isError' in res && res.isError).not.toBe(true);
+      expect(events.some((e) => e.type === 'profile_updated')).toBe(true);
+    } finally {
+      unsub();
+    }
+  });
+
+  it('push_program publishes program_received', async () => {
+    const db = openDb(':memory:');
+    runMigrations(db);
+    const events: any[] = [];
+    const unsub = eventBus.subscribe((ev) => events.push(ev));
+    try {
+      const handler = pushProgram.handler(db);
+      const program = {
+        schema_version: '1.0.0',
+        program: {
+          id: '550e8400-e29b-41d4-a716-446655440000',
+          name: 'Test',
+          generated_at: '2026-04-08T10:00:00Z',
+          generated_by: 'test',
+          goal: 'strength',
+          notes: '',
+          duration_weeks: 4,
+          sessions_per_week: 3,
+        },
+        sessions: [
+          {
+            id: '7c9e6679-7425-40de-944b-e07fc1f90ae7',
+            session_number: 1,
+            name: 'A',
+            estimated_duration_minutes: 60,
+            tags: [],
+            blocks: [
+              {
+                id: 'b1',
+                name: 'Main',
+                type: 'strength',
+                notes: '',
+                exercises: [
+                  {
+                    id: '22222222-2222-4222-8222-222222222222',
+                    order: 1,
+                    name: 'Bench',
+                    category: 'compound',
+                    muscle_groups_primary: ['chest'],
+                    muscle_groups_secondary: [],
+                    equipment: ['barbell'],
+                    sets: [
+                      {
+                        set_number: 1,
+                        type: 'working',
+                        reps: 5,
+                        reps_min: null,
+                        reps_max: null,
+                        weight_kg: 80,
+                        weight_unit: 'kg',
+                        rpe_target: 8,
+                        duration_seconds: null,
+                        rest_seconds: 180,
+                        notes: '',
+                      },
+                    ],
+                    coaching_cues: [],
+                    progression_note: null,
+                    alternatives: [],
+                  },
+                ],
+              },
+            ],
+          },
+        ],
+      };
+      const res = await handler({ program });
+      expect('isError' in res && res.isError).not.toBe(true);
+      expect(events.some((e) => e.type === 'program_received')).toBe(true);
+    } finally {
+      unsub();
+    }
   });
 });

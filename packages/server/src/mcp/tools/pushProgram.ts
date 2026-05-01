@@ -10,7 +10,7 @@ type ToolResult =
 export const pushProgram = {
   name: 'push_program',
   description:
-    "Push a new WorkoutProgram and mark it active (deactivates any prior program atomically). Pass a fully-formed program JSON conforming to schema_version 1.0.0 — the same format the PWA imports. Returns { id, imported_at }.",
+    "Validate and store a new active workout program. The program object must include schema_version: \"1.0.0\". The previous active program is archived automatically. Pass a fully-formed program JSON — the same format the PWA imports. Returns { id, imported_at }.",
   inputSchema: {
     type: 'object' as const,
     properties: {

@@ -35,7 +35,6 @@ app.route('/api', api);
 const mcp = new Hono();
 mcp.use('*', bearerAuth(env.BEARER_TOKEN));
 mcp.all('/*', async (c) => mountMcp(c.req.raw, db));
-mcp.all('/', async (c) => mountMcp(c.req.raw, db));
 app.route('/mcp', mcp);
 
 serve({ fetch: app.fetch, port: env.PORT }, (info) => {
