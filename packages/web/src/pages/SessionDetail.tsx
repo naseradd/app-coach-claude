@@ -12,13 +12,17 @@ import {
   NavBar,
   Sheet,
 } from '../components/ui/index.js';
-import { mockProgram } from '../mocks/index.js';
+import { useProgram } from '../store/program.store.js';
 import type { Exercise } from '@coach/shared';
 
 export function SessionDetail() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const session = useMemo(() => mockProgram.sessions.find((s) => s.id === id), [id]);
+  const program = useProgram((s) => s.program);
+  const session = useMemo(
+    () => program?.sessions.find((s) => s.id === id) ?? null,
+    [id, program],
+  );
   const [openExercise, setOpenExercise] = useState<Exercise | null>(null);
 
   if (!session) {
@@ -26,7 +30,7 @@ export function SessionDetail() {
       <div style={{ padding: 32, textAlign: 'center' }}>
         <NavBar title="" onBack={() => navigate('/')} />
         <p className="t-body" style={{ color: 'var(--ink-3)' }}>
-          Séance introuvable
+          {program === null ? 'Aucun programme actif' : 'Séance introuvable'}
         </p>
       </div>
     );
@@ -50,7 +54,7 @@ export function SessionDetail() {
             'radial-gradient(120% 90% at 0% 0%, var(--accent-soft), transparent 60%), var(--bg-surface)',
         }}
       >
-        <Badge variant="accent">{mockProgram.program.name}</Badge>
+        <Badge variant="accent">{program!.program.name}</Badge>
         <h1 className="t-title-1" style={{ margin: '12px 0 8px', color: 'var(--ink)' }}>
           {session.name}
         </h1>
