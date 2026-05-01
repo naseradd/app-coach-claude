@@ -13,6 +13,8 @@ import {
   Sheet,
 } from '../components/ui/index.js';
 import { useProgram } from '../store/program.store.js';
+import { useWorkout } from '../store/workout.store.js';
+import { PreSessionCheckIn } from '../components/workout/PreSessionCheckIn.js';
 import type { Exercise } from '@coach/shared';
 
 export function SessionDetail() {
@@ -24,6 +26,8 @@ export function SessionDetail() {
     [id, program],
   );
   const [openExercise, setOpenExercise] = useState<Exercise | null>(null);
+  const [checkInOpen, setCheckInOpen] = useState(false);
+  const startWorkout = useWorkout((s) => s.start);
 
   if (!session) {
     return (
@@ -159,7 +163,7 @@ export function SessionDetail() {
           size="xl"
           fullWidth
           leadingIcon={<Play size={18} fill="currentColor" />}
-          onClick={() => navigate(`/workout?session=${session.id}`)}
+          onClick={() => setCheckInOpen(true)}
         >
           Démarrer la séance
         </Button>
@@ -169,6 +173,17 @@ export function SessionDetail() {
       <Sheet open={!!openExercise} onClose={() => setOpenExercise(null)} detent="large">
         {openExercise ? <ExerciseSheetBody exercise={openExercise} /> : null}
       </Sheet>
+
+      {/* Pre-session check-in */}
+      <PreSessionCheckIn
+        open={checkInOpen}
+        onClose={() => setCheckInOpen(false)}
+        onConfirm={async (preSession) => {
+          setCheckInOpen(false);
+          await startWorkout(program!.program.id, session.id, preSession);
+          navigate(`/workout?session=${session.id}`);
+        }}
+      />
     </div>
   );
 }

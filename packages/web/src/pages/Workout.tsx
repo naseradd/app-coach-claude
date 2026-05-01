@@ -21,35 +21,59 @@ import {
   Sheet,
   Stepper,
 } from '../components/ui/index.js';
-import type { Exercise, SessionDef, WorkSet, SessionReport } from '@coach/shared';
+import type {
+  Exercise,
+  SessionDef,
+  WorkSet,
+  SessionReport as SessionReportType,
+} from '@coach/shared';
+import { SessionReport as SessionReportSchema } from '@coach/shared';
 import { RestTimer } from './RestTimer.js';
 import { PostSession } from './PostSession.js';
 import { useProgram } from '../store/program.store.js';
 import { useHistory } from '../store/history.store.js';
-import { useWorkout } from '../store/workout.store.js';
+import {
+  useWorkout,
+  type SetLogEntry,
+  type PreSessionCheckIn,
+} from '../store/workout.store.js';
+import { useWakeLock } from '../hooks/useWakeLock.js';
+import { useHaptics } from '../hooks/useHaptics.js';
+import { detectPr } from '../utils/prDetect.js';
 import { apiClient } from '../api/endpoints.js';
 
-type Phase = 'set' | 'rest' | 'done';
-
-interface SetActuals {
-  reps: number;
-  weight: number;
-  rpe: number;
+interface FlatItem {
+  exercise: Exercise;
+  setIndex: number;
+  set: WorkSet;
+  globalCursor: number;
 }
 
 export function Workout() {
   const [params] = useSearchParams();
   const navigate = useNavigate();
   const program = useProgram((s) => s.program);
-  const sessionId = params.get('session');
+  const sessionIdParam = params.get('session');
+  const workoutSessionId = useWorkout((s) => s.sessionId);
+  const workoutProgramId = useWorkout((s) => s.programId);
+
+  // Effective sessionId: prefer the in-flight workout (resume case) over the
+  // URL param so a stale URL never overrides actual state.
+  const sessionId = workoutSessionId ?? sessionIdParam;
 
   const session = useMemo<SessionDef | null>(() => {
     if (!program) return null;
-    if (sessionId) {
-      return program.sessions.find((s) => s.id === sessionId) ?? null;
-    }
+    if (sessionId) return program.sessions.find((s) => s.id === sessionId) ?? null;
     return program.sessions[0] ?? null;
   }, [program, sessionId]);
+
+  // Guard: if no active workout AND no URL pointer, redirect home. This keeps
+  // /workout from being accessible without a check-in flow.
+  useEffect(() => {
+    if (program && session && !workoutProgramId && !sessionIdParam) {
+      navigate('/', { replace: true });
+    }
+  }, [program, session, workoutProgramId, sessionIdParam, navigate]);
 
   if (!program || !session) {
     return (
@@ -87,75 +111,100 @@ interface InnerProps {
 function WorkoutInner({ program, session }: InnerProps) {
   const navigate = useNavigate();
   const upsertReport = useHistory((s) => s.upsert);
-  const startWorkout = useWorkout((s) => s.start);
-  const setWorkoutPhase = useWorkout((s) => s.setPhase);
-  const endWorkout = useWorkout((s) => s.end);
+  const history = useHistory((s) => s.reports);
 
-  // Flat list of (exercise, set)
-  const flatPlan = useMemo(() => {
-    const out: { exercise: Exercise; setIndex: number; set: WorkSet }[] = [];
+  // Workout store ----------------------------------------------------------
+  const startWorkoutAction = useWorkout((s) => s.start);
+  const endWorkoutAction = useWorkout((s) => s.end);
+  const phase = useWorkout((s) => s.phase);
+  const exerciseIndex = useWorkout((s) => s.exerciseIndex);
+  const setIndex = useWorkout((s) => s.setIndex);
+  const setsLog = useWorkout((s) => s.setsLog);
+  const preSessionStored = useWorkout((s) => s.preSession);
+  const programIdInStore = useWorkout((s) => s.programId);
+  const startedAt = useWorkout((s) => s.startedAt);
+  const logSet = useWorkout((s) => s.logSet);
+  const startRest = useWorkout((s) => s.startRest);
+  const endRest = useWorkout((s) => s.endRest);
+  const updateLastSetRest = useWorkout((s) => s.updateLastSetRest);
+  const advanceSet = useWorkout((s) => s.advanceSet);
+  const setExerciseSetIndex = useWorkout((s) => s.setExerciseSetIndex);
+
+  const haptics = useHaptics();
+
+  // Wake lock active for the whole workout (not during 'done' / submitted).
+  useWakeLock(programIdInStore !== null && phase !== 'done');
+
+  // Resolve flat plan grouped by exercise index → set index ----------------
+  const exercisesFlat: Exercise[] = useMemo(() => {
+    const out: Exercise[] = [];
     for (const block of session.blocks) {
-      for (const exercise of block.exercises) {
-        exercise.sets.forEach((set, i) => {
-          out.push({ exercise, setIndex: i, set });
-        });
-      }
+      for (const exercise of block.exercises) out.push(exercise);
     }
     return out;
   }, [session]);
 
+  const flatPlan: FlatItem[] = useMemo(() => {
+    const out: FlatItem[] = [];
+    let cursor = 0;
+    for (const exercise of exercisesFlat) {
+      exercise.sets.forEach((set, i) => {
+        out.push({ exercise, setIndex: i, set, globalCursor: cursor++ });
+      });
+    }
+    return out;
+  }, [exercisesFlat]);
+
   const totalSets = flatPlan.length;
-  const exercisesFlat = useMemo(
-    () => Array.from(new Set(flatPlan.map((p) => p.exercise))),
-    [flatPlan],
-  );
   const totalExercises = exercisesFlat.length;
 
-  const [phase, setPhase] = useState<Phase>('set');
-  const [cursor, setCursor] = useState(0);
-  const [actuals, setActuals] = useState<Record<string, SetActuals>>({});
-  const [cuesOpen, setCuesOpen] = useState(false);
-  const [moreOpen, setMoreOpen] = useState(false);
-  const [closeOpen, setCloseOpen] = useState(false);
-  const [globalSeconds, setGlobalSeconds] = useState(0);
-  const [startedAt] = useState(() => new Date());
-
-  // Mark workout active in the store the moment this view mounts.
-  // Phase 8 will use this for crash recovery.
+  // If resume landed us on indices that don't fit this session (rare but
+  // possible if the program changed), clamp to start.
   useEffect(() => {
-    startWorkout(session.id);
-    return () => {
-      // Only end if we left without completion. PostSession's submit handler
-      // also clears it after a successful POST.
-      const active = useWorkout.getState().active;
-      if (active && active.sessionId === session.id) endWorkout();
-    };
+    if (exerciseIndex >= totalExercises || exerciseIndex < 0) {
+      setExerciseSetIndex(0, 0);
+    } else {
+      const ex = exercisesFlat[exerciseIndex];
+      if (ex && (setIndex >= ex.sets.length || setIndex < 0)) {
+        setExerciseSetIndex(exerciseIndex, 0);
+      }
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [session.id]);
+  }, [totalExercises]);
 
+  // Bootstrap: if no active workout in store yet, kick one off using the
+  // URL-based session. This keeps the flow working even if a user reloads
+  // mid-workout before the SSE/resume completed (rare race).
   useEffect(() => {
-    setWorkoutPhase(phase);
-  }, [phase, setWorkoutPhase]);
-
-  // Global timer
-  useEffect(() => {
-    const id = window.setInterval(() => setGlobalSeconds((s) => s + 1), 1000);
-    return () => clearInterval(id);
+    if (programIdInStore !== null) return;
+    void startWorkoutAction(program.program.id, session.id, {
+      energy_level: null,
+      sleep_quality: null,
+      soreness_level: null,
+      notes: '',
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const currentItem = flatPlan[cursor];
-  const previousItem = cursor > 0 ? flatPlan[cursor - 1] : null;
+  // Current item -----------------------------------------------------------
+  const currentExercise = exercisesFlat[exerciseIndex] ?? null;
+  const currentSet = currentExercise?.sets[setIndex] ?? null;
+  const cursor = useMemo(() => {
+    if (!currentExercise || !currentSet) return 0;
+    return flatPlan.findIndex(
+      (p) => p.exercise.id === currentExercise.id && p.setIndex === setIndex,
+    );
+  }, [currentExercise, currentSet, setIndex, flatPlan]);
   const nextItem = cursor + 1 < flatPlan.length ? flatPlan[cursor + 1] : null;
 
-  const exerciseIdx = currentItem
-    ? exercisesFlat.findIndex((e) => e.id === currentItem.exercise.id) + 1
-    : 0;
-
-  const formKey = currentItem ? `${currentItem.exercise.id}-${currentItem.setIndex}` : '';
-  const stored = actuals[formKey];
-  const initialReps = stored?.reps ?? currentItem?.set.reps ?? currentItem?.set.reps_min ?? 8;
-  const initialWeight = stored?.weight ?? currentItem?.set.weight_kg ?? 0;
-  const initialRpe = stored?.rpe ?? currentItem?.set.rpe_target ?? 7;
+  // Form state for the current set ----------------------------------------
+  const formKey = currentExercise && currentSet
+    ? `${currentExercise.id}-${setIndex}`
+    : '';
+  const initialReps =
+    (currentSet?.reps ?? currentSet?.reps_min ?? 8) as number;
+  const initialWeight = (currentSet?.weight_kg ?? 0) as number;
+  const initialRpe = (currentSet?.rpe_target ?? 7) as number;
   const [reps, setReps] = useState(initialReps);
   const [weight, setWeight] = useState(initialWeight);
   const [rpe, setRpe] = useState(initialRpe);
@@ -166,24 +215,20 @@ function WorkoutInner({ program, session }: InnerProps) {
     setRpe(initialRpe);
   }, [formKey, initialReps, initialWeight, initialRpe]);
 
-  const validateSet = () => {
-    if (!currentItem) return;
-    setActuals((prev) => ({ ...prev, [formKey]: { reps, weight, rpe } }));
-    if (cursor + 1 >= flatPlan.length) {
-      setPhase('done');
-      return;
-    }
-    if (currentItem.set.rest_seconds > 0) {
-      setPhase('rest');
-    } else {
-      setCursor(cursor + 1);
-    }
-  };
+  // UI bits ---------------------------------------------------------------
+  const [cuesOpen, setCuesOpen] = useState(false);
+  const [moreOpen, setMoreOpen] = useState(false);
+  const [closeOpen, setCloseOpen] = useState(false);
 
-  const completeRest = () => {
-    setCursor(cursor + 1);
-    setPhase('set');
-  };
+  // Global timer derived from startedAt for accuracy across reloads.
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => {
+    const id = window.setInterval(() => setNow(Date.now()), 1000);
+    return () => clearInterval(id);
+  }, []);
+  const globalSeconds = startedAt
+    ? Math.max(0, Math.floor((now - new Date(startedAt).getTime()) / 1000))
+    : 0;
 
   const fmtTime = (s: number) => {
     const m = Math.floor(s / 60);
@@ -191,68 +236,137 @@ function WorkoutInner({ program, session }: InnerProps) {
     return `${m}:${String(sec).padStart(2, '0')}`;
   };
 
+  // Live PR check while editing the current set's actuals.
+  const livePr = useMemo(
+    () => detectPr(history, currentExercise?.id ?? '', weight, reps),
+    [history, currentExercise?.id, weight, reps],
+  );
+
+  // Validate set ----------------------------------------------------------
+  const validateSet = () => {
+    if (!currentExercise || !currentSet) return;
+    haptics('success');
+
+    const prCheck = detectPr(history, currentExercise.id, weight, reps);
+
+    const entry: SetLogEntry = {
+      exercise_id: currentExercise.id,
+      exercise_name: currentExercise.name,
+      set_number: currentSet.set_number,
+      type: currentSet.type,
+      planned_reps: currentSet.reps,
+      planned_weight_kg: currentSet.weight_kg,
+      rpe_planned: currentSet.rpe_target,
+      rest_planned_seconds: currentSet.rest_seconds,
+      actual_reps: reps,
+      actual_weight_kg: weight,
+      rpe_actual: rpe,
+      // Will be patched once rest ends. If user skips rest, this stays 0.
+      rest_taken_seconds: 0,
+      duration_seconds: currentSet.duration_seconds,
+      completed: true,
+      is_pr: prCheck.isPr,
+      notes: '',
+    };
+    logSet(entry);
+
+    const isLastSet =
+      exerciseIndex + 1 >= totalExercises && setIndex + 1 >= currentExercise.sets.length;
+
+    if (isLastSet) {
+      // Skip rest, go straight to done.
+      advanceSet(currentExercise.sets.length, totalExercises);
+      return;
+    }
+
+    if (currentSet.rest_seconds > 0) {
+      startRest();
+    } else {
+      advanceSet(currentExercise.sets.length, totalExercises);
+    }
+  };
+
+  const completeRest = () => {
+    if (!currentExercise) return;
+    const elapsed = endRest();
+    updateLastSetRest(elapsed);
+    advanceSet(currentExercise.sets.length, totalExercises);
+  };
+
+  const skipSet = () => {
+    if (!currentExercise) return;
+    setMoreOpen(false);
+    advanceSet(currentExercise.sets.length, totalExercises);
+  };
+
+  const skipExercise = () => {
+    if (!currentExercise) return;
+    setMoreOpen(false);
+    if (exerciseIndex + 1 < totalExercises) {
+      setExerciseSetIndex(exerciseIndex + 1, 0);
+    } else {
+      advanceSet(currentExercise.sets.length, totalExercises);
+    }
+  };
+
   // Done phase — build a real SessionReport and POST.
   if (phase === 'done') {
-    const exerciseProgress = exercisesFlat.map((ex) => {
-      const setsTotal = ex.sets.length;
-      const setsDone = ex.sets.filter((_s, i) => actuals[`${ex.id}-${i}`]).length;
-      return { exercise: ex, setsDone, setsTotal };
-    });
-    const totalVolumeKg = Object.values(actuals).reduce((acc, a) => acc + a.reps * a.weight, 0);
-    const totalSetsDone = Object.keys(actuals).length;
-    const totalRepsDone = Object.values(actuals).reduce((acc, a) => acc + a.reps, 0);
-    const durationMinutes = Math.max(1, Math.round((Date.now() - startedAt.getTime()) / 60000));
-
-    const handleSubmit = async (overallFeeling: number, notes: string) => {
-      const report = buildReport({
-        program,
-        session,
-        startedAt,
-        durationMinutes,
-        actuals,
-        flatPlan,
-        overallFeeling,
-        notes,
-      });
-      try {
-        const saved = await apiClient.postSession(report);
-        upsertReport(saved);
-        endWorkout();
-        return { ok: true as const, id: saved.id };
-      } catch (e) {
-        return {
-          ok: false as const,
-          error: e instanceof Error ? e.message : 'submit_failed',
-        };
-      }
-    };
-
     return (
-      <PostSession
+      <DoneScreen
+        program={program}
         session={session}
-        exerciseProgress={exerciseProgress}
-        durationMinutes={durationMinutes}
-        totalVolumeKg={totalVolumeKg}
-        totalSetsDone={totalSetsDone}
-        totalRepsDone={totalRepsDone}
-        prCount={0}
-        onSubmitReport={handleSubmit}
+        exercisesFlat={exercisesFlat}
+        setsLog={setsLog}
+        preSession={preSessionStored}
+        startedAtIso={startedAt}
+        haptics={haptics}
         onBack={() => navigate('/')}
+        onSubmit={async (overallFeeling, notes) => {
+          const report = buildReport({
+            program,
+            session,
+            startedAt: startedAt ? new Date(startedAt) : new Date(),
+            exercisesFlat,
+            setsLog,
+            preSession: preSessionStored,
+            overallFeeling,
+            notes,
+          });
+          const parsed = SessionReportSchema.safeParse(report);
+          if (!parsed.success) {
+            return {
+              ok: false as const,
+              error: 'Rapport invalide — détails: ' + JSON.stringify(parsed.error.flatten().fieldErrors),
+            };
+          }
+          try {
+            const saved = await apiClient.postSession(parsed.data);
+            upsertReport(saved);
+            haptics('success');
+            await endWorkoutAction();
+            return { ok: true as const, id: saved.id };
+          } catch (e) {
+            return {
+              ok: false as const,
+              error: e instanceof Error ? e.message : 'submit_failed',
+            };
+          }
+        }}
         onNavigateToReport={(id) => navigate(`/history/${id}`)}
       />
     );
   }
 
-  if (!currentItem) return null;
+  if (!currentExercise || !currentSet) return null;
 
-  const exercise = currentItem.exercise;
-  const set = currentItem.set;
-  const setNumberInExercise = currentItem.setIndex + 1;
-  const totalSetsInExercise = exercise.sets.length;
+  const setNumberInExercise = setIndex + 1;
+  const totalSetsInExercise = currentExercise.sets.length;
   const setProgressOverall = (cursor + 1) / totalSets;
+  const exerciseIdx = exerciseIndex + 1;
 
-  const pr =
-    weight > (set.weight_kg ?? 0) || (reps > (set.reps ?? 0) && weight >= (set.weight_kg ?? 0));
+  const lastForThisExercise = [...setsLog]
+    .reverse()
+    .find((s) => s.exercise_id === currentExercise.id);
 
   return (
     <div style={{ minHeight: '100dvh', background: 'var(--bg-canvas)' }}>
@@ -315,23 +429,23 @@ function WorkoutInner({ program, session }: InnerProps) {
         <Card variant="surface" padding={16}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
             <h2 className="t-title-2" style={{ margin: 0, color: 'var(--ink)', flex: 1 }}>
-              {exercise.name}
+              {currentExercise.name}
             </h2>
-            {exercise.video_url ? (
+            {currentExercise.video_url ? (
               <IconButton ariaLabel="Vidéo">
                 <Video size={18} />
               </IconButton>
             ) : null}
           </div>
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginTop: 8 }}>
-            {exercise.muscle_groups_primary.map((m) => (
+            {currentExercise.muscle_groups_primary.map((m) => (
               <Badge key={m} variant="accent">
                 {m}
               </Badge>
             ))}
           </div>
 
-          {exercise.coaching_cues.length > 0 ? (
+          {currentExercise.coaching_cues.length > 0 ? (
             <button
               type="button"
               onClick={() => setCuesOpen((v) => !v)}
@@ -352,7 +466,7 @@ function WorkoutInner({ program, session }: InnerProps) {
                 fontWeight: 500,
               }}
             >
-              <span>Cues techniques ({exercise.coaching_cues.length})</span>
+              <span>Cues techniques ({currentExercise.coaching_cues.length})</span>
               <motion.span animate={{ rotate: cuesOpen ? 180 : 0 }}>
                 <ChevronDown size={16} />
               </motion.span>
@@ -375,7 +489,7 @@ function WorkoutInner({ program, session }: InnerProps) {
                   overflow: 'hidden',
                 }}
               >
-                {exercise.coaching_cues.map((c, i) => (
+                {currentExercise.coaching_cues.map((c, i) => (
                   <li key={i} className="t-callout">
                     {c}
                   </li>
@@ -399,19 +513,19 @@ function WorkoutInner({ program, session }: InnerProps) {
                 {setNumberInExercise}/{totalSetsInExercise}
               </div>
               <div className="t-footnote tabular" style={{ color: 'var(--ink-3)', marginTop: 4 }}>
-                cible · {set.reps ?? `${set.reps_min ?? '?'}+`} reps · {set.weight_kg ?? '—'}
-                {set.weight_unit}
-                {set.rpe_target ? ` · RPE ${set.rpe_target}` : ''}
+                cible · {currentSet.reps ?? `${currentSet.reps_min ?? '?'}+`} reps · {currentSet.weight_kg ?? '—'}
+                {currentSet.weight_unit}
+                {currentSet.rpe_target ? ` · RPE ${currentSet.rpe_target}` : ''}
               </div>
             </div>
-            {previousItem && previousItem.exercise.id === exercise.id ? (
+            {lastForThisExercise ? (
               <div style={{ textAlign: 'right' }}>
                 <div className="t-caption" style={{ color: 'var(--ink-3)' }}>
-                  dernière fois
+                  set précédent
                 </div>
                 <div className="t-footnote tabular" style={{ color: 'var(--ink-2)', marginTop: 2 }}>
-                  {actuals[`${previousItem.exercise.id}-${previousItem.setIndex}`]?.reps ?? '—'} ×{' '}
-                  {actuals[`${previousItem.exercise.id}-${previousItem.setIndex}`]?.weight ?? '—'}kg
+                  {lastForThisExercise.actual_reps ?? '—'} ×{' '}
+                  {lastForThisExercise.actual_weight_kg ?? '—'}kg
                 </div>
               </div>
             ) : null}
@@ -424,7 +538,7 @@ function WorkoutInner({ program, session }: InnerProps) {
               min={0}
               max={50}
               onChange={setReps}
-              hint={set.reps ? `cible · ${set.reps}` : undefined}
+              hint={currentSet.reps ? `cible · ${currentSet.reps}` : undefined}
             />
             <Stepper
               label="Poids"
@@ -432,14 +546,16 @@ function WorkoutInner({ program, session }: InnerProps) {
               step={2.5}
               min={0}
               max={500}
-              unit={set.weight_unit}
+              unit={currentSet.weight_unit}
               onChange={setWeight}
-              hint={set.weight_kg ? `cible · ${set.weight_kg}${set.weight_unit}` : undefined}
+              hint={
+                currentSet.weight_kg ? `cible · ${currentSet.weight_kg}${currentSet.weight_unit}` : undefined
+              }
             />
             <RPESegmented value={rpe} onChange={setRpe} />
           </div>
 
-          {pr ? (
+          {livePr.isPr ? (
             <motion.div
               initial={{ scale: 0.92, opacity: 0 }}
               animate={{ scale: 1, opacity: 1 }}
@@ -450,7 +566,8 @@ function WorkoutInner({ program, session }: InnerProps) {
                 <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
                   <Trophy size={18} style={{ color: 'var(--accent)' }} />
                   <div className="t-footnote" style={{ color: 'var(--ink-2)' }}>
-                    PR projeté · valide pour confirmer
+                    PR projeté · meilleur précédent {livePr.bestPrevious?.weight_kg}kg ×{' '}
+                    {livePr.bestPrevious?.reps}
                   </div>
                 </div>
               </Card>
@@ -490,43 +607,26 @@ function WorkoutInner({ program, session }: InnerProps) {
       {/* Rest timer */}
       <RestTimer
         open={phase === 'rest'}
-        initialSeconds={set.rest_seconds || 60}
+        initialSeconds={currentSet.rest_seconds || 60}
         nextExercise={nextItem?.exercise}
         nextSet={nextItem?.set}
         onSkip={completeRest}
         onComplete={completeRest}
-        onAdd30={() => {
-          /* Phase 8 wires this */
-        }}
       />
 
       {/* More sheet */}
       <Sheet open={moreOpen} onClose={() => setMoreOpen(false)}>
         <ListGroup header="set en cours">
-          <ListRow
-            label="Skip ce set"
-            onClick={() => {
-              setMoreOpen(false);
-              if (cursor + 1 < flatPlan.length) setCursor(cursor + 1);
-              else setPhase('done');
-            }}
-          />
+          <ListRow label="Skip ce set" onClick={skipSet} />
           <ListRow
             label={<span style={{ color: 'var(--danger)' }}>Skip cet exercice</span>}
-            onClick={() => {
-              setMoreOpen(false);
-              const nextIdx = flatPlan.findIndex(
-                (p, i) => i > cursor && p.exercise.id !== exercise.id,
-              );
-              if (nextIdx === -1) setPhase('done');
-              else setCursor(nextIdx);
-            }}
+            onClick={skipExercise}
           />
         </ListGroup>
         <div style={{ height: 16 }} />
-        {exercise.alternatives.length > 0 ? (
+        {currentExercise.alternatives.length > 0 ? (
           <ListGroup header="alternatives">
-            {exercise.alternatives.map((alt, i) => (
+            {currentExercise.alternatives.map((alt, i) => (
               <ListRow
                 key={`${alt.name}-${i}`}
                 label={alt.name}
@@ -552,9 +652,9 @@ function WorkoutInner({ program, session }: InnerProps) {
               variant="bordered"
               size="lg"
               fullWidth
-              onClick={() => {
+              onClick={async () => {
                 setCloseOpen(false);
-                endWorkout();
+                await endWorkoutAction();
                 navigate('/');
               }}
             >
@@ -570,73 +670,149 @@ function WorkoutInner({ program, session }: InnerProps) {
   );
 }
 
+// -------------------------------------------------------------------------
+// Done screen — separated to keep the main render tree readable.
+// -------------------------------------------------------------------------
+
+interface DoneProps {
+  program: NonNullable<ReturnType<typeof useProgram.getState>['program']>;
+  session: SessionDef;
+  exercisesFlat: Exercise[];
+  setsLog: SetLogEntry[];
+  preSession: PreSessionCheckIn;
+  startedAtIso: string | null;
+  haptics: ReturnType<typeof useHaptics>;
+  onBack: () => void;
+  onNavigateToReport: (id: string) => void;
+  onSubmit: (
+    overallFeeling: number,
+    notes: string,
+  ) => Promise<{ ok: true; id: string } | { ok: false; error: string }>;
+}
+
+function DoneScreen({
+  session,
+  exercisesFlat,
+  setsLog,
+  startedAtIso,
+  onBack,
+  onNavigateToReport,
+  onSubmit,
+}: DoneProps) {
+  const startedAt = startedAtIso ? new Date(startedAtIso) : new Date();
+  const durationMinutes = Math.max(1, Math.round((Date.now() - startedAt.getTime()) / 60000));
+
+  const exerciseProgress = exercisesFlat.map((ex) => {
+    const setsTotal = ex.sets.length;
+    const setsDone = setsLog.filter((s) => s.exercise_id === ex.id && s.completed).length;
+    return { exercise: ex, setsDone, setsTotal };
+  });
+
+  const totalSetsDone = setsLog.filter((s) => s.completed).length;
+  const totalRepsDone = setsLog
+    .filter((s) => s.completed)
+    .reduce((acc, s) => acc + (s.actual_reps ?? 0), 0);
+  const totalVolumeKg = setsLog
+    .filter((s) => s.completed && s.type !== 'warmup')
+    .reduce((acc, s) => acc + (s.actual_reps ?? 0) * (s.actual_weight_kg ?? 0), 0);
+  const prCount = setsLog.filter((s) => s.is_pr).length;
+
+  return (
+    <PostSession
+      session={session}
+      exerciseProgress={exerciseProgress}
+      durationMinutes={durationMinutes}
+      totalVolumeKg={totalVolumeKg}
+      totalSetsDone={totalSetsDone}
+      totalRepsDone={totalRepsDone}
+      prCount={prCount}
+      onSubmitReport={onSubmit}
+      onBack={onBack}
+      onNavigateToReport={onNavigateToReport}
+    />
+  );
+}
+
+// -------------------------------------------------------------------------
+// Report builder
+// -------------------------------------------------------------------------
+
 interface BuildReportInput {
   program: NonNullable<ReturnType<typeof useProgram.getState>['program']>;
   session: SessionDef;
   startedAt: Date;
-  durationMinutes: number;
-  actuals: Record<string, SetActuals>;
-  flatPlan: { exercise: Exercise; setIndex: number; set: WorkSet }[];
+  exercisesFlat: Exercise[];
+  setsLog: SetLogEntry[];
+  preSession: PreSessionCheckIn;
   overallFeeling: number;
   notes: string;
 }
 
-/**
- * Convert in-memory `actuals` map into the canonical SessionReport shape
- * accepted by POST /api/sessions. Phase 8 will replace the random UUID
- * with a stable id and add real PR detection from history.
- */
-function buildReport(input: BuildReportInput): SessionReport {
-  const { program, session, startedAt, durationMinutes, actuals, flatPlan, overallFeeling, notes } =
-    input;
-  const completedAt = new Date().toISOString();
-
-  // Group flatPlan by exercise to build exercises_log.
-  const byExercise = new Map<string, { exercise: Exercise; entries: typeof flatPlan }>();
-  for (const item of flatPlan) {
-    const key = item.exercise.id;
-    if (!byExercise.has(key)) byExercise.set(key, { exercise: item.exercise, entries: [] });
-    byExercise.get(key)!.entries.push(item);
-  }
+function buildReport(input: BuildReportInput): SessionReportType {
+  const {
+    program,
+    session,
+    startedAt,
+    exercisesFlat,
+    setsLog,
+    preSession,
+    overallFeeling,
+    notes,
+  } = input;
+  const completedAt = new Date();
+  const durationMinutes = Math.max(
+    1,
+    Math.round((completedAt.getTime() - startedAt.getTime()) / 60000),
+  );
 
   let totalSetsPlanned = 0;
   let totalSetsDone = 0;
   let totalRepsDone = 0;
   let totalVolumeKg = 0;
 
-  const exercises_log = Array.from(byExercise.values()).map(({ exercise, entries }) => {
-    const sets_log = entries.map(({ set, setIndex }) => {
-      const a = actuals[`${exercise.id}-${setIndex}`];
-      totalSetsPlanned += 1;
-      const completed = Boolean(a);
-      if (completed) {
+  const exercises_log = exercisesFlat.map((exercise) => {
+    const planned = exercise.sets;
+    totalSetsPlanned += planned.length;
+
+    // Map planned sets to actual log entries by set_number when available.
+    const sets_log = planned.map((plannedSet) => {
+      const logged = setsLog.find(
+        (l) => l.exercise_id === exercise.id && l.set_number === plannedSet.set_number,
+      );
+      const completed = Boolean(logged?.completed);
+      if (completed && logged) {
         totalSetsDone += 1;
-        totalRepsDone += a!.reps;
-        totalVolumeKg += a!.reps * a!.weight;
+        totalRepsDone += logged.actual_reps ?? 0;
+        if (logged.type !== 'warmup') {
+          totalVolumeKg += (logged.actual_reps ?? 0) * (logged.actual_weight_kg ?? 0);
+        }
       }
       return {
-        set_number: set.set_number,
-        type: set.type,
-        planned_reps: set.reps,
-        actual_reps: a?.reps ?? null,
-        planned_weight_kg: set.weight_kg,
-        actual_weight_kg: a?.weight ?? null,
-        rpe_planned: set.rpe_target,
-        rpe_actual: (a?.rpe ?? null) as number | null,
-        rest_planned_seconds: set.rest_seconds,
-        rest_taken_seconds: set.rest_seconds, // Phase 8: capture real rest taken
-        duration_seconds: set.duration_seconds,
+        set_number: plannedSet.set_number,
+        type: plannedSet.type,
+        planned_reps: plannedSet.reps,
+        actual_reps: logged?.actual_reps ?? null,
+        planned_weight_kg: plannedSet.weight_kg,
+        actual_weight_kg: logged?.actual_weight_kg ?? null,
+        rpe_planned: plannedSet.rpe_target,
+        rpe_actual: logged?.rpe_actual ?? null,
+        rest_planned_seconds: plannedSet.rest_seconds,
+        rest_taken_seconds: logged?.rest_taken_seconds ?? 0,
+        duration_seconds: plannedSet.duration_seconds,
         completed,
-        is_pr: false,
-        notes: '',
+        is_pr: logged?.is_pr ?? false,
+        notes: logged?.notes ?? '',
       };
     });
-    const allDone = sets_log.every((s) => s.completed);
+
+    const allDone = sets_log.length > 0 && sets_log.every((s) => s.completed);
+    const noneDone = sets_log.every((s) => !s.completed);
+
     return {
       exercise_id: exercise.id,
       exercise_name: exercise.name,
       completed: allDone,
-      skipped: sets_log.every((s) => !s.completed),
+      skipped: noneDone,
       sets_log,
       notes: '',
     };
@@ -651,14 +827,14 @@ function buildReport(input: BuildReportInput): SessionReport {
     session_id: session.id,
     session_name: session.name,
     started_at: startedAt.toISOString(),
-    completed_at: completedAt,
+    completed_at: completedAt.toISOString(),
     duration_actual_minutes: durationMinutes,
     completion_rate,
     pre_session: {
-      energy_level: null,
-      sleep_quality: null,
-      soreness_level: null,
-      notes: '',
+      energy_level: preSession.energy_level,
+      sleep_quality: preSession.sleep_quality,
+      soreness_level: preSession.soreness_level,
+      notes: preSession.notes,
     },
     post_session: {
       overall_feeling: Math.max(1, Math.min(5, overallFeeling)),
@@ -675,15 +851,10 @@ function buildReport(input: BuildReportInput): SessionReport {
   };
 }
 
-/**
- * `crypto.randomUUID` is widely available; this small helper keeps the
- * call-site readable and isolates the typing for older type lib targets.
- */
 function cryptoRandomUuidV4(): string {
   if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
     return crypto.randomUUID();
   }
-  // Fallback (very unlikely path on modern browsers).
   const hex = '0123456789abcdef';
   let s = '';
   for (let i = 0; i < 36; i++) {

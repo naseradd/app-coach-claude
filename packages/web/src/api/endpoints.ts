@@ -19,4 +19,15 @@ export const apiClient = {
   setupStatus: () =>
     api<{ complete: boolean; missing: string[] }>('/api/setup-status'),
   wipe: () => api<{ ok: true }>('/api/data', { method: 'DELETE' }),
+  // Active session — opaque blob managed entirely by useWorkout. We type it
+  // as `unknown` here because the schema is a client-driven contract that
+  // would only add friction if mirrored into shared.
+  getActiveSession: () => api<unknown | null>('/api/active-session'),
+  putActiveSession: (s: unknown) =>
+    api<{ ok: true }>('/api/active-session', {
+      method: 'PUT',
+      body: JSON.stringify(s),
+    }),
+  deleteActiveSession: () =>
+    api<{ ok: true }>('/api/active-session', { method: 'DELETE' }),
 };

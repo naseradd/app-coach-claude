@@ -1,8 +1,10 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { ArrowRight, Video, Plus } from 'lucide-react';
 import { Button, Card, IconButton } from '../components/ui/index.js';
 import type { Exercise, WorkSet } from '@coach/shared';
+import { useWakeLock } from '../hooks/useWakeLock.js';
+import { useHaptics } from '../hooks/useHaptics.js';
 
 interface Props {
   open: boolean;
@@ -12,13 +14,13 @@ interface Props {
   nextSet?: WorkSet;
   onSkip: () => void;
   onComplete: () => void;
-  onAdd30: () => void;
   onShowVideo?: () => void;
 }
 
 /**
  * Full-screen sheet sliding up from bottom.
- * Phase 8 will wire vibrate / wake lock; here only timer logic.
+ * Holds a wake lock while open, fires haptics at 10s warning and at 0s.
+ * Tracks user-initiated +30s additions internally so the ring animates.
  */
 export function RestTimer({
   open,
@@ -27,21 +29,52 @@ export function RestTimer({
   nextSet,
   onSkip,
   onComplete,
-  onAdd30,
   onShowVideo,
 }: Props) {
+  const [target, setTarget] = useState(initialSeconds);
   const [remaining, setRemaining] = useState(initialSeconds);
-  const target = initialSeconds;
+  const haptics = useHaptics();
+  // Track which haptic pulses we've already fired this rest cycle so a tab
+  // re-render doesn't double-buzz.
+  const firedWarn = useRef(false);
+  const firedEnd = useRef(false);
+
+  useWakeLock(open);
 
   useEffect(() => {
-    if (open) setRemaining(initialSeconds);
+    if (open) {
+      setTarget(initialSeconds);
+      setRemaining(initialSeconds);
+      firedWarn.current = false;
+      firedEnd.current = false;
+    }
   }, [open, initialSeconds]);
 
   useEffect(() => {
     if (!open) return;
-    const id = window.setInterval(() => setRemaining((r) => r - 1), 1000);
+    const id = window.setInterval(() => {
+      setRemaining((r) => {
+        const next = r - 1;
+        if (!firedWarn.current && r > 10 && next <= 10 && next > 0) {
+          firedWarn.current = true;
+          haptics('warn');
+        }
+        if (!firedEnd.current && r > 0 && next <= 0) {
+          firedEnd.current = true;
+          haptics('success');
+        }
+        return next;
+      });
+    }, 1000);
     return () => clearInterval(id);
-  }, [open]);
+  }, [open, haptics]);
+
+  const onAdd30 = () => {
+    setTarget((t) => t + 30);
+    setRemaining((r) => r + 30);
+    // Re-arm warn if we crossed back above 10s.
+    firedWarn.current = false;
+  };
 
   const overdue = remaining < 0;
   const absRemaining = Math.abs(remaining);

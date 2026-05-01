@@ -5,6 +5,7 @@ import { subscribeEvents } from '../api/sse.js';
 import { useSettings } from '../store/settings.store.js';
 import { useProgram } from '../store/program.store.js';
 import { useHistory } from '../store/history.store.js';
+import { useWorkout } from '../store/workout.store.js';
 
 /**
  * Wires settings → API config + subscribes to SSE.
@@ -43,6 +44,9 @@ export function useApiBoot(): void {
     // Initial load — fire and forget; stores set their own loading flag.
     void programFetch();
     void historyFetch();
+    // Try to restore an in-flight workout. Pages observe `useWorkout.resumed`
+    // (one-shot flag) and can choose to redirect the user to /workout.
+    void useWorkout.getState().resume();
 
     const onEvent = (e: SseEvent) => {
       switch (e.type) {
