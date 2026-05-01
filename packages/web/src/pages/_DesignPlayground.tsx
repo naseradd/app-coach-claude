@@ -9,11 +9,21 @@ import {
   ListGroup,
   ListRow,
   ProgressBar,
+  Segmented,
+  RPESegmented,
+  Stepper,
+  Toggle,
 } from '../components/ui/index.js';
 
 export function DesignPlayground() {
   const [theme, setTheme] = useState<ThemeId>(loadTheme());
   const [progress, setProgress] = useState(0.42);
+  const [unit, setUnit] = useState<'kg' | 'lbs'>('kg');
+  const [reps, setReps] = useState(8);
+  const [weight, setWeight] = useState(80);
+  const [rpe, setRpe] = useState(7);
+  const [notif, setNotif] = useState(true);
+  const [haptic, setHaptic] = useState(false);
 
   const setT = (t: ThemeId) => {
     setTheme(t);
@@ -128,6 +138,56 @@ export function DesignPlayground() {
         </div>
       </Section>
 
+      <Section title="Segmented">
+        <Segmented
+          options={[
+            { value: 'kg', label: 'kg' },
+            { value: 'lbs', label: 'lbs' },
+          ]}
+          value={unit}
+          onChange={setUnit}
+          ariaLabel="Unité"
+        />
+      </Section>
+
+      <Section title="Stepper">
+        <div style={{ display: 'grid', gap: 16 }}>
+          <Stepper
+            label="Reps"
+            value={reps}
+            min={0}
+            max={50}
+            onChange={setReps}
+            hint="Cible : 8-12"
+          />
+          <Stepper
+            label="Poids"
+            value={weight}
+            unit={unit}
+            min={0}
+            step={2.5}
+            onChange={setWeight}
+          />
+        </div>
+      </Section>
+
+      <Section title="RPESegmented">
+        <RPESegmented value={rpe} onChange={setRpe} />
+      </Section>
+
+      <Section title="Toggle">
+        <div style={{ display: 'grid', gap: 12 }}>
+          <Row>
+            <span className="t-body">Notifications</span>
+            <Toggle checked={notif} onChange={setNotif} ariaLabel="Notifications" />
+          </Row>
+          <Row>
+            <span className="t-body">Haptique</span>
+            <Toggle checked={haptic} onChange={setHaptic} ariaLabel="Haptique" />
+          </Row>
+        </div>
+      </Section>
+
       <Section title="ListGroup + ListRow">
         <ListGroup header="paramètres">
           <ListRow
@@ -165,5 +225,23 @@ function Section({ title, children }: { title: string; children: React.ReactNode
       <h2 className="t-title-2" style={{ margin: '0 0 12px' }}>{title}</h2>
       {children}
     </section>
+  );
+}
+
+function Row({ children }: { children: React.ReactNode }) {
+  return (
+    <div
+      style={{
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        gap: 12,
+        background: 'var(--bg-surface)',
+        padding: '10px 16px',
+        borderRadius: 14,
+      }}
+    >
+      {children}
+    </div>
   );
 }

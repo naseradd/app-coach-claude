@@ -9,3 +9,8 @@ export { Card } from './Card.js';
 export type { CardVariant } from './Card.js';
 export { ListGroup } from './ListGroup.js';
 export { ListRow } from './ListRow.js';
+export { Segmented } from './Segmented.js';
+export type { SegmentedOption } from './Segmented.js';
+export { RPESegmented } from './RPESegmented.js';
+export { Stepper } from './Stepper.js';
+export { Toggle } from './Toggle.js';
