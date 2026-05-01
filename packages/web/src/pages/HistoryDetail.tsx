@@ -1,13 +1,48 @@
-import { useMemo } from 'react';
+import { useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { Trophy } from 'lucide-react';
+import type { SessionReport } from '@coach/shared';
 import { Badge, Card, NavBar } from '../components/ui/index.js';
-import { mockReports } from '../mocks/index.js';
+import { useHistory } from '../store/history.store.js';
 
 export function HistoryDetail() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const report = useMemo(() => mockReports.find((r) => r.id === id), [id]);
+  const fetchOne = useHistory((s) => s.fetchOne);
+  const cached = useHistory((s) => (id ? s.byId[id] : undefined));
+
+  const [report, setReport] = useState<SessionReport | null | undefined>(cached);
+  const [loading, setLoading] = useState(!cached);
+
+  useEffect(() => {
+    if (!id) return;
+    if (cached) {
+      setReport(cached);
+      setLoading(false);
+      return;
+    }
+    let cancelled = false;
+    setLoading(true);
+    void fetchOne(id).then((r) => {
+      if (cancelled) return;
+      setReport(r);
+      setLoading(false);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [id, cached, fetchOne]);
+
+  if (loading) {
+    return (
+      <div>
+        <NavBar title="Archive" onBack={() => navigate('/history')} />
+        <p className="t-body" style={{ padding: 32, color: 'var(--ink-3)' }}>
+          Chargement…
+        </p>
+      </div>
+    );
+  }
 
   if (!report) {
     return (
@@ -33,14 +68,9 @@ export function HistoryDetail() {
 
   return (
     <div style={{ paddingBottom: 24 }}>
-      <NavBar
-        title={report.session_name}
-        subtitle={datetime}
-        onBack={() => navigate('/history')}
-      />
+      <NavBar title={report.session_name} subtitle={datetime} onBack={() => navigate('/history')} />
 
       <div style={{ padding: '8px 20px', display: 'grid', gap: 16 }}>
-        {/* Stats grid */}
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
           <StatTile label="Durée" value={`${report.duration_actual_minutes}min`} />
           <StatTile label="Volume" value={`${Math.round(report.volume_summary.total_volume_kg)}kg`} />
@@ -48,7 +78,6 @@ export function HistoryDetail() {
           <StatTile label="Complétion" value={`${completionPct}%`} />
         </div>
 
-        {/* Notes */}
         {report.post_session.notes ? (
           <Card variant="tinted" padding={16}>
             <div
@@ -68,7 +97,6 @@ export function HistoryDetail() {
           </Card>
         ) : null}
 
-        {/* Pre-session */}
         {report.pre_session.notes ? (
           <Card variant="surface" padding={16}>
             <div className="t-subhead" style={{ color: 'var(--ink-3)', marginBottom: 8 }}>
@@ -88,7 +116,6 @@ export function HistoryDetail() {
           </Card>
         ) : null}
 
-        {/* Exercises log */}
         {report.exercises_log.length > 0 ? (
           <div style={{ display: 'grid', gap: 12 }}>
             <div
@@ -130,10 +157,7 @@ export function HistoryDetail() {
                       </thead>
                       <tbody>
                         {ex.sets_log.map((s) => (
-                          <tr
-                            key={s.set_number}
-                            style={{ borderTop: '1px solid var(--separator)' }}
-                          >
+                          <tr key={s.set_number} style={{ borderTop: '1px solid var(--separator)' }}>
                             <td className="t-footnote tabular" style={{ padding: '8px 0' }}>
                               {s.set_number}
                             </td>
@@ -159,10 +183,7 @@ export function HistoryDetail() {
                     </table>
                   ) : null}
                   {!allDone && ex.notes ? (
-                    <div
-                      className="t-footnote"
-                      style={{ color: 'var(--ink-3)', marginTop: 8 }}
-                    >
+                    <div className="t-footnote" style={{ color: 'var(--ink-3)', marginTop: 8 }}>
                       {ex.notes}
                     </div>
                   ) : null}

@@ -1,16 +1,12 @@
+import { useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion } from 'motion/react';
 import { Trophy, ChevronRight, Inbox } from 'lucide-react';
 import { Badge, Card, ListGroup } from '../components/ui/index.js';
-import {
-  mockReports,
-  formatDayMonthFR,
-  formatMonthYearFR,
-  relativeDays,
-} from '../mocks/index.js';
+import { formatDayMonthFR, formatMonthYearFR, relativeDays } from '../utils/format.js';
+import { useHistory } from '../store/history.store.js';
+import { useSettings } from '../store/settings.store.js';
 import type { SessionReport } from '@coach/shared';
-
-const today = new Date('2026-05-01T10:00:00Z');
 
 function groupByMonth(reports: SessionReport[]): Map<string, SessionReport[]> {
   const sorted = [...reports].sort(
@@ -27,8 +23,15 @@ function groupByMonth(reports: SessionReport[]): Map<string, SessionReport[]> {
 
 export function History() {
   const navigate = useNavigate();
-  const reports = mockReports;
-  const grouped = groupByMonth(reports);
+  const reports = useHistory((s) => s.reports);
+  const loading = useHistory((s) => s.loading);
+  const error = useHistory((s) => s.error);
+  const serverUrl = useSettings((s) => s.serverUrl);
+  const bearer = useSettings((s) => s.bearer);
+  const isConfigured = Boolean(serverUrl && bearer);
+
+  const today = useMemo(() => new Date(), []);
+  const grouped = useMemo(() => groupByMonth(reports), [reports]);
 
   const totalVolume = reports.reduce((acc, r) => acc + r.volume_summary.total_volume_kg, 0);
   const totalReps = reports.reduce((acc, r) => acc + r.volume_summary.total_reps_done, 0);
@@ -38,40 +41,35 @@ export function History() {
     0,
   );
 
+  if (!isConfigured) {
+    return (
+      <Empty
+        title="Connecte ton serveur"
+        body="Les archives proviennent de ton serveur MCP. Configure-le pour les voir."
+      />
+    );
+  }
+
+  if (loading && reports.length === 0) {
+    return (
+      <div style={{ minHeight: '60vh', display: 'grid', placeItems: 'center' }}>
+        <div className="t-callout" style={{ color: 'var(--ink-3)' }}>
+          Chargement…
+        </div>
+      </div>
+    );
+  }
+
+  if (error && reports.length === 0) {
+    return <Empty title="Connexion impossible" body={error} />;
+  }
+
   if (reports.length === 0) {
     return (
-      <div
-        style={{
-          minHeight: '60vh',
-          display: 'flex',
-          flexDirection: 'column',
-          alignItems: 'center',
-          justifyContent: 'center',
-          padding: 32,
-          textAlign: 'center',
-        }}
-      >
-        <div
-          style={{
-            width: 96,
-            height: 96,
-            borderRadius: '50%',
-            background: 'var(--accent-soft)',
-            display: 'grid',
-            placeItems: 'center',
-            color: 'var(--accent)',
-            marginBottom: 20,
-          }}
-        >
-          <Inbox size={42} />
-        </div>
-        <h2 className="t-title-2" style={{ margin: 0, color: 'var(--ink)' }}>
-          Pas encore d'archives
-        </h2>
-        <p className="t-callout" style={{ color: 'var(--ink-3)', marginTop: 8, maxWidth: 280 }}>
-          Tes séances apparaîtront ici dès la première terminée.
-        </p>
-      </div>
+      <Empty
+        title="Pas encore d'archives"
+        body="Tes séances apparaîtront ici dès la première terminée."
+      />
     );
   }
 
@@ -88,7 +86,6 @@ export function History() {
       </header>
 
       <div style={{ padding: '0 20px', display: 'grid', gap: 20 }}>
-        {/* Stats trio */}
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 8 }}>
           <Card variant="surface" padding={14}>
             <div className="t-footnote" style={{ color: 'var(--ink-3)' }}>
@@ -116,7 +113,6 @@ export function History() {
           </Card>
         </div>
 
-        {/* Grouped by month */}
         {Array.from(grouped.entries()).map(([monthLabel, items]) => (
           <div key={monthLabel}>
             <div
@@ -233,6 +229,43 @@ export function History() {
           </div>
         ))}
       </div>
+    </div>
+  );
+}
+
+function Empty({ title, body }: { title: string; body: string }) {
+  return (
+    <div
+      style={{
+        minHeight: '60vh',
+        display: 'flex',
+        flexDirection: 'column',
+        alignItems: 'center',
+        justifyContent: 'center',
+        padding: 32,
+        textAlign: 'center',
+      }}
+    >
+      <div
+        style={{
+          width: 96,
+          height: 96,
+          borderRadius: '50%',
+          background: 'var(--accent-soft)',
+          display: 'grid',
+          placeItems: 'center',
+          color: 'var(--accent)',
+          marginBottom: 20,
+        }}
+      >
+        <Inbox size={42} />
+      </div>
+      <h2 className="t-title-2" style={{ margin: 0, color: 'var(--ink)' }}>
+        {title}
+      </h2>
+      <p className="t-callout" style={{ color: 'var(--ink-3)', marginTop: 8, maxWidth: 280 }}>
+        {body}
+      </p>
     </div>
   );
 }
