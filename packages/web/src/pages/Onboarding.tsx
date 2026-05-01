@@ -3,23 +3,56 @@ import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'motion/react';
 import { Sparkles, Bot, ArrowRight, Plug } from 'lucide-react';
 import { Button, Card } from '../components/ui/index.js';
+import { useSettings } from '../store/settings.store.js';
+import { setApiConfig } from '../api/client.js';
+import { apiClient } from '../api/endpoints.js';
 
 const TOTAL_SLIDES = 3;
 
 export function Onboarding() {
   const navigate = useNavigate();
+  const setSettings = useSettings((s) => s.set);
+  const initialUrl = useSettings((s) => s.serverUrl);
+  const initialBearer = useSettings((s) => s.bearer);
+
   const [slide, setSlide] = useState(0);
-  const [serverUrl, setServerUrl] = useState('');
-  const [token, setToken] = useState('');
+  const [serverUrl, setServerUrl] = useState(initialUrl);
+  const [token, setToken] = useState(initialBearer);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const isLast = slide === TOTAL_SLIDES - 1;
 
-  const next = () => {
-    if (isLast) {
-      // Phase 7: real connection. Mock: just go home.
-      navigate('/');
-    } else {
+  const next = async () => {
+    if (!isLast) {
       setSlide((s) => s + 1);
+      return;
+    }
+    if (!serverUrl.trim() || !token.trim()) {
+      setError('Renseigne URL et token.');
+      return;
+    }
+    setBusy(true);
+    setError(null);
+    try {
+      // Apply config eagerly so apiClient.health() can reach it.
+      const url = serverUrl.trim();
+      const bearer = token.trim();
+      setApiConfig({ baseUrl: url, bearer });
+      await apiClient.health();
+      // Persist only after a successful round-trip; useApiBoot picks it up.
+      setSettings({ serverUrl: url, bearer });
+      navigate('/');
+    } catch (e) {
+      setError(
+        e instanceof Error
+          ? `Connexion impossible : ${e.message}`
+          : 'Connexion impossible',
+      );
+      // Roll back the in-memory config so failures don't leak partial state.
+      setApiConfig({ baseUrl: '', bearer: '' });
+    } finally {
+      setBusy(false);
     }
   };
 
@@ -106,6 +139,9 @@ export function Onboarding() {
                       value={serverUrl}
                       onChange={(e) => setServerUrl(e.target.value)}
                       placeholder="https://coach.fly.dev"
+                      autoCapitalize="off"
+                      autoCorrect="off"
+                      spellCheck={false}
                       style={{
                         marginTop: 6,
                         width: '100%',
@@ -129,6 +165,9 @@ export function Onboarding() {
                       onChange={(e) => setToken(e.target.value)}
                       type="password"
                       placeholder="•••"
+                      autoCapitalize="off"
+                      autoCorrect="off"
+                      spellCheck={false}
                       style={{
                         marginTop: 6,
                         width: '100%',
@@ -143,6 +182,11 @@ export function Onboarding() {
                       }}
                     />
                   </div>
+                  {error ? (
+                    <div className="t-footnote" style={{ color: 'var(--danger)' }}>
+                      {error}
+                    </div>
+                  ) : null}
                 </div>
               </Card>
             </Slide>
@@ -196,8 +240,8 @@ export function Onboarding() {
       {/* Bottom CTA */}
       <div style={{ padding: '12px 20px calc(env(safe-area-inset-bottom) + 16px)' }}>
         {isLast ? (
-          <Button variant="primary" size="xl" fullWidth onClick={next}>
-            Connecter
+          <Button variant="primary" size="xl" fullWidth onClick={next} disabled={busy}>
+            {busy ? 'Connexion…' : 'Connecter'}
           </Button>
         ) : (
           <Button

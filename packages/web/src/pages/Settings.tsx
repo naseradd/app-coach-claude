@@ -8,9 +8,14 @@ import {
   ListGroup,
   ListRow,
   Segmented,
+  Sheet,
   Toggle,
 } from '../components/ui/index.js';
-import { applyTheme, loadTheme, type ThemeId } from '../design/themes.js';
+import type { ThemeId } from '../design/themes.js';
+import { useSettings } from '../store/settings.store.js';
+import { useProgram } from '../store/program.store.js';
+import { useHistory } from '../store/history.store.js';
+import { apiClient } from '../api/endpoints.js';
 
 type SwatchTheme = Exclude<ThemeId, 'auto'>;
 
@@ -29,13 +34,33 @@ const SWATCHES: SwatchDef[] = [
 ];
 
 export function Settings() {
-  const [theme, setTheme] = useState<ThemeId>(loadTheme());
-  const [unit, setUnit] = useState<'kg' | 'lbs'>('kg');
-  const [haptic, setHaptic] = useState(true);
-  const [voice, setVoice] = useState(false);
-  const [serverUrl, setServerUrl] = useState('');
-  const [token, setToken] = useState('');
+  const theme = useSettings((s) => s.theme);
+  const weightUnit = useSettings((s) => s.weightUnit);
+  const haptics = useSettings((s) => s.haptics);
+  const persistedUrl = useSettings((s) => s.serverUrl);
+  const persistedBearer = useSettings((s) => s.bearer);
+  const setSettings = useSettings((s) => s.set);
+
+  const connectionStatus = useProgram((s) => s.connectionStatus);
+  const programFetch = useProgram((s) => s.fetch);
+  const historyFetch = useHistory((s) => s.fetch);
+
+  const [serverUrl, setServerUrl] = useState(persistedUrl);
+  const [token, setToken] = useState(persistedBearer);
   const [copied, setCopied] = useState(false);
+  const [wipeOpen, setWipeOpen] = useState(false);
+  const [wipeBusy, setWipeBusy] = useState(false);
+  const [wipeError, setWipeError] = useState<string | null>(null);
+  const [saveFlash, setSaveFlash] = useState(false);
+
+  // Re-sync local form state when persisted values change
+  // (e.g. after Onboarding writes them, or on first hydration).
+  useEffect(() => {
+    setServerUrl(persistedUrl);
+  }, [persistedUrl]);
+  useEffect(() => {
+    setToken(persistedBearer);
+  }, [persistedBearer]);
 
   useEffect(() => {
     if (!copied) return;
@@ -43,13 +68,46 @@ export function Settings() {
     return () => clearTimeout(t);
   }, [copied]);
 
-  const setT = (id: ThemeId) => {
-    setTheme(id);
-    applyTheme(id);
+  useEffect(() => {
+    if (!saveFlash) return;
+    const t = setTimeout(() => setSaveFlash(false), 1600);
+    return () => clearTimeout(t);
+  }, [saveFlash]);
+
+  const setT = (id: ThemeId) => setSettings({ theme: id });
+
+  const trimmedUrl = serverUrl.trim();
+  const mcpUrl = trimmedUrl ? `${trimmedUrl.replace(/\/+$/, '')}/mcp` : '—';
+
+  const saveConnection = () => {
+    // useApiBoot picks up the change and reconnects automatically.
+    setSettings({ serverUrl: trimmedUrl, bearer: token.trim() });
+    setSaveFlash(true);
   };
 
-  const mcpUrl = serverUrl ? `${serverUrl.replace(/\/+$/, '')}/mcp` : '—';
-  const reachable = false; // Phase 7 wires this
+  const onConfirmWipe = async () => {
+    setWipeBusy(true);
+    setWipeError(null);
+    try {
+      await apiClient.wipe();
+      setWipeOpen(false);
+      // Refresh stores so the UI immediately reflects the empty server.
+      await Promise.all([programFetch(), historyFetch()]);
+    } catch (e) {
+      setWipeError(e instanceof Error ? e.message : 'wipe_failed');
+    } finally {
+      setWipeBusy(false);
+    }
+  };
+
+  const statusBadge = (() => {
+    if (!persistedUrl || !persistedBearer) {
+      return <Badge variant="neutral">Non configuré</Badge>;
+    }
+    if (connectionStatus === 'connected') return <Badge variant="success">Connecté</Badge>;
+    if (connectionStatus === 'disconnected') return <Badge variant="danger">Hors-ligne</Badge>;
+    return <Badge variant="neutral">Connexion…</Badge>;
+  })();
 
   return (
     <div style={{ paddingBottom: 24 }}>
@@ -156,8 +214,8 @@ export function Settings() {
                   { value: 'kg', label: 'kg' },
                   { value: 'lbs', label: 'lbs' },
                 ]}
-                value={unit}
-                onChange={setUnit}
+                value={weightUnit}
+                onChange={(v) => setSettings({ weightUnit: v })}
                 ariaLabel="Unité de poids"
               />
             }
@@ -165,12 +223,13 @@ export function Settings() {
           <ListRow
             label="Haptiques"
             subtitle="Vibrations de confirmation"
-            trailing={<Toggle checked={haptic} onChange={setHaptic} ariaLabel="Haptiques" />}
-          />
-          <ListRow
-            label="Voix coach"
-            subtitle="Annonces sets, repos terminé"
-            trailing={<Toggle checked={voice} onChange={setVoice} ariaLabel="Voix coach" />}
+            trailing={
+              <Toggle
+                checked={haptics}
+                onChange={(v) => setSettings({ haptics: v })}
+                ariaLabel="Haptiques"
+              />
+            }
           />
         </ListGroup>
 
@@ -185,6 +244,9 @@ export function Settings() {
                 value={serverUrl}
                 onChange={(e) => setServerUrl(e.target.value)}
                 placeholder="https://coach.fly.dev"
+                autoCapitalize="off"
+                autoCorrect="off"
+                spellCheck={false}
                 style={{
                   marginTop: 6,
                   width: '100%',
@@ -208,6 +270,9 @@ export function Settings() {
                 onChange={(e) => setToken(e.target.value)}
                 type="password"
                 placeholder="•••"
+                autoCapitalize="off"
+                autoCorrect="off"
+                spellCheck={false}
                 style={{
                   marginTop: 6,
                   width: '100%',
@@ -222,13 +287,17 @@ export function Settings() {
                 }}
               />
             </div>
-            <Button variant="tinted" size="md" fullWidth onClick={() => { /* Phase 7 */ }}>
-              Sauver et reconnecter
+            <Button variant="tinted" size="md" fullWidth onClick={saveConnection}>
+              {saveFlash ? 'Sauvegardé · reconnecté' : 'Sauver et reconnecter'}
             </Button>
           </div>
           <ListRow
             label="URL MCP"
-            subtitle={<span className="tabular" style={{ wordBreak: 'break-all' }}>{mcpUrl}</span>}
+            subtitle={
+              <span className="tabular" style={{ wordBreak: 'break-all' }}>
+                {mcpUrl}
+              </span>
+            }
             trailing={
               <IconButton
                 ariaLabel="Copier"
@@ -243,13 +312,7 @@ export function Settings() {
               </IconButton>
             }
           />
-          <div style={{ padding: '4px 16px 14px' }}>
-            {!reachable ? (
-              <Badge variant="danger">Hors-ligne · configure d'abord</Badge>
-            ) : (
-              <Badge variant="success">Connecté</Badge>
-            )}
-          </div>
+          <div style={{ padding: '4px 16px 14px' }}>{statusBadge}</div>
         </ListGroup>
 
         {/* Zone danger */}
@@ -259,7 +322,10 @@ export function Settings() {
               variant="bordered"
               size="md"
               fullWidth
-              onClick={() => { /* Phase 7 */ }}
+              onClick={() => {
+                setWipeError(null);
+                setWipeOpen(true);
+              }}
             >
               <span style={{ color: 'var(--danger)' }}>Effacer toutes les données serveur</span>
             </Button>
@@ -275,6 +341,46 @@ export function Settings() {
           </div>
         </Card>
       </div>
+
+      {/* Wipe confirmation sheet (no window.confirm — looks bad on iOS standalone) */}
+      <Sheet open={wipeOpen} onClose={() => (wipeBusy ? undefined : setWipeOpen(false))}>
+        <div style={{ display: 'grid', gap: 12, padding: '4px 0 8px' }}>
+          <h3 className="t-title-2" style={{ margin: 0 }}>
+            Effacer toutes les données ?
+          </h3>
+          <p className="t-callout" style={{ color: 'var(--ink-3)', margin: 0 }}>
+            Programme actif, profil et historique des séances seront supprimés du serveur. Cette
+            action est définitive.
+          </p>
+          {wipeError ? (
+            <div className="t-footnote" style={{ color: 'var(--danger)' }}>
+              {wipeError}
+            </div>
+          ) : null}
+          <div style={{ display: 'grid', gap: 10, marginTop: 4 }}>
+            <Button
+              variant="bordered"
+              size="lg"
+              fullWidth
+              onClick={onConfirmWipe}
+              disabled={wipeBusy}
+            >
+              <span style={{ color: 'var(--danger)' }}>
+                {wipeBusy ? 'Suppression…' : 'Confirmer la suppression'}
+              </span>
+            </Button>
+            <Button
+              variant="primary"
+              size="lg"
+              fullWidth
+              onClick={() => setWipeOpen(false)}
+              disabled={wipeBusy}
+            >
+              Annuler
+            </Button>
+          </div>
+        </div>
+      </Sheet>
     </div>
   );
 }
