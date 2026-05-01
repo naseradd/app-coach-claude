@@ -11,6 +11,7 @@ import { sessionsRoute } from './routes/sessions.js';
 import { setupRoute } from './routes/setup.js';
 import { dataRoute } from './routes/data.js';
 import { eventsRoute } from './routes/events.js';
+import { activeSessionRoute } from './routes/active-session.js';
 import { mountMcp } from './mcp/handler.js';
 import { staticRoute } from './routes/static.js';
 
@@ -28,6 +29,7 @@ api.route('/program', programsRoute(db));
 api.route('/sessions', sessionsRoute(db));
 api.route('/setup-status', setupRoute(db));
 api.route('/data', dataRoute(db));
+api.route('/active-session', activeSessionRoute(db));
 api.route('/events', eventsRoute);
 app.route('/api', api);
 
