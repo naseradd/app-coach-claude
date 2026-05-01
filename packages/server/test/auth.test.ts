@@ -28,4 +28,14 @@ describe('bearerAuth', () => {
     const res = await app.request('/open');
     expect(res.status).toBe(200);
   });
+
+  it('accepts correct token via ?token= query (EventSource fallback)', async () => {
+    const res = await app.request(`/secure/ping?token=${TOKEN}`);
+    expect(res.status).toBe(200);
+  });
+
+  it('rejects wrong token via ?token= query', async () => {
+    const res = await app.request('/secure/ping?token=wrong');
+    expect(res.status).toBe(401);
+  });
 });

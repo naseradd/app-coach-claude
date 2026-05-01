@@ -1,0 +1,31 @@
+import { create } from 'zustand';
+import { persist } from 'zustand/middleware';
+import type { ThemeId } from '../design/themes.js';
+
+interface SettingsState {
+  theme: ThemeId;
+  serverUrl: string;
+  bearer: string;
+  weightUnit: 'kg' | 'lbs';
+  haptics: boolean;
+  set: (p: Partial<Omit<SettingsState, 'set'>>) => void;
+}
+
+/**
+ * Persisted settings (theme, server config, prefs).
+ * Persisted under `coach.settings` in localStorage so users don't have to
+ * reconfigure after a hard refresh / PWA reinstall.
+ */
+export const useSettings = create<SettingsState>()(
+  persist(
+    (set) => ({
+      theme: 'warm-cream',
+      serverUrl: '',
+      bearer: '',
+      weightUnit: 'kg',
+      haptics: true,
+      set: (p) => set(p),
+    }),
+    { name: 'coach.settings', version: 1 },
+  ),
+);
