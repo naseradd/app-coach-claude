@@ -55,5 +55,17 @@ export default defineConfig({
   build: {
     target: 'es2022',
     sourcemap: true,
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          // Split vendor bundles so route chunks stay small and the
+          // main entry contains only app boot + router.
+          react: ['react', 'react-dom', 'react-router-dom'],
+          motion: ['motion', 'motion/react'],
+          icons: ['lucide-react'],
+          state: ['zustand', 'zod'],
+        },
+      },
+    },
   },
 });
