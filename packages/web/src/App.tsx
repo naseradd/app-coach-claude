@@ -1,5 +1,5 @@
-import { DesignPlayground } from './pages/_DesignPlayground.js';
+import { AppRouter } from './router.js';
 
 export function App() {
-  return <DesignPlayground />;
+  return <AppRouter />;
 }
