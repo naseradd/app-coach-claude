@@ -1,3 +1,5 @@
+import { DesignPlayground } from './pages/_DesignPlayground.js';
+
 export function App() {
-  return <div style={{ padding: 20 }}>Coach Claude — boot OK</div>;
+  return <DesignPlayground />;
 }
