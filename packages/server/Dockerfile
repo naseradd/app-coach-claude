@@ -16,10 +16,13 @@ COPY tsconfig.base.json tsconfig.json ./
 COPY packages/shared packages/shared
 COPY packages/web packages/web
 COPY packages/server packages/server
-RUN pnpm --filter @coach/shared build \
- && pnpm --filter @coach/web build \
- && pnpm --filter @coach/server build \
- && cp -r packages/web/dist packages/server/dist-web
+# Build chain. --force on tsc -b avoids skipped emits when buildinfo from host snuck in.
+RUN cd packages/shared && pnpm exec tsc -b --force && cd /app \
+ && cd packages/web && pnpm exec tsc -b --force && pnpm exec vite build && cd /app \
+ && cd packages/server && pnpm exec tsc -b --force && cp -r src/db/sql dist/db/sql && cd /app \
+ && cp -r packages/web/dist packages/server/dist-web \
+ # pnpm deploy bundles @coach/server + its transitive deps (incl. @coach/shared) into /deploy
+ && pnpm --filter @coach/server --prod deploy /deploy
 
 FROM base AS runtime
 ENV NODE_ENV=production
@@ -28,11 +31,10 @@ ENV NODE_ENV=production
 ENV STATIC_DIR=dist-web
 ENV DB_PATH=/data/coach.db
 WORKDIR /app
-COPY --from=build /app/packages/server/dist ./dist
+# pnpm deploy result: /deploy has node_modules + dist + package.json ready to run, no workspace protocol left.
+COPY --from=build /deploy/dist ./dist
+COPY --from=build /deploy/node_modules ./node_modules
+COPY --from=build /deploy/package.json ./
 COPY --from=build /app/packages/server/dist-web ./dist-web
-COPY --from=build /app/packages/server/package.json ./
-COPY --from=build /app/packages/shared/dist ./node_modules/@coach/shared/dist
-COPY --from=build /app/packages/shared/package.json ./node_modules/@coach/shared/
-RUN pnpm install --prod --no-frozen-lockfile --filter @coach/server
 EXPOSE 8080
 CMD ["node", "dist/index.js"]

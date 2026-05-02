@@ -2,9 +2,13 @@ node_modules
 **/node_modules
 **/dist
 **/dist-web
+**/*.tsbuildinfo
 .git
 .github
 docs
 *.md
 !README.md
 .fly
+.local-data
+packages/server/.env
+packages/server/data

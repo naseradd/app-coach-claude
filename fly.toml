@@ -1,5 +1,5 @@
 app = "coach-claude"
-primary_region = "yul"
+primary_region = "yyz"
 
 [build]
   dockerfile = "packages/server/Dockerfile"
