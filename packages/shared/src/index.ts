@@ -7,3 +7,4 @@ export * from './schemas/program.js';
 export * from './schemas/report.js';
 export * from './schemas/profile.js';
 export * from './schemas/events.js';
+export * from './json-schema.js';

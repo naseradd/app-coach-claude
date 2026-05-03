@@ -46,6 +46,7 @@ export default defineConfig({
           /^\/token/,
           /^\/register/,
           /^\/\.well-known\//,
+          /^\/schema\.json/,
         ],
         runtimeCaching: [
           {
@@ -58,7 +59,8 @@ export default defineConfig({
               url.pathname.startsWith('/authorize') ||
               url.pathname.startsWith('/token') ||
               url.pathname.startsWith('/register') ||
-              url.pathname.startsWith('/.well-known/'),
+              url.pathname.startsWith('/.well-known/') ||
+              url.pathname === '/schema.json',
             handler: 'NetworkOnly',
           },
         ],

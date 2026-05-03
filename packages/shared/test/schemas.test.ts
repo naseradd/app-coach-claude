@@ -5,6 +5,7 @@ import {
   UserProfile,
   SseEvent,
   SCHEMA_VERSION,
+  buildSchemaPayload,
 } from '../src/index.js';
 
 // Imports kept to match plan; ensure exports resolve
@@ -121,6 +122,20 @@ describe('SessionReport', () => {
   it('rejects overall_feeling > 5 (5-emoji picker)', () => {
     const bad = { ...validReport, post_session: { ...validReport.post_session, overall_feeling: 6 } };
     expect(SessionReport.safeParse(bad).success).toBe(false);
+  });
+});
+
+describe('buildSchemaPayload', () => {
+  it('produces JSON-roundtrippable payload', () => {
+    const payload = buildSchemaPayload();
+    const roundtripped = JSON.parse(JSON.stringify(payload));
+    expect(roundtripped.schema_version).toBe('1.0.0');
+    expect(roundtripped.schemas.WorkoutProgram).toBeDefined();
+    expect(roundtripped.schemas.UserProfile).toBeDefined();
+    expect(roundtripped.schemas.SessionReport).toBeDefined();
+    expect(roundtripped.examples.WorkoutProgram).toBeDefined();
+    expect(roundtripped.examples.UserProfile).toBeDefined();
+    expect(Array.isArray(roundtripped.notes)).toBe(true);
   });
 });
 

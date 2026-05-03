@@ -17,6 +17,7 @@ import { mountMcp } from './mcp/handler.js';
 import { staticRoute } from './routes/static.js';
 import { oauthRoute } from './routes/oauth.js';
 import { discoveryRoute } from './routes/discovery.js';
+import { buildSchemaPayload } from '@coach/shared';
 
 const env = loadEnv();
 const db = openDb(env.DB_PATH);
@@ -29,6 +30,12 @@ const app = new Hono();
 app.use('*', logger());
 
 app.route('/health', healthRoute);
+
+// Public live schema dump (no auth) — lets Claude.ai and curl debugging fetch
+// the canonical JSON Schemas + examples without needing a bearer token. Same
+// payload as the `get_schema` MCP tool. Schema is non-sensitive (mirrors the
+// open-source app code).
+app.get('/schema.json', (c) => c.json(buildSchemaPayload()));
 
 // Public OAuth 2.0 + discovery for Claude.ai's MCP connector.
 // MUST be mounted before any bearer-auth middleware (Claude hits these unauthed).

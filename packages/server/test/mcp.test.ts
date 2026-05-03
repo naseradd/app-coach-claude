@@ -8,6 +8,7 @@ import { readActiveProgram } from '../src/mcp/tools/readActiveProgram.js';
 import { pushProgram } from '../src/mcp/tools/pushProgram.js';
 import { readHistory } from '../src/mcp/tools/readHistory.js';
 import { readAggregateStats } from '../src/mcp/tools/readAggregateStats.js';
+import { getSchemaTool } from '../src/mcp/tools/getSchema.js';
 import { eventBus } from '../src/events/bus.js';
 
 const sampleProfile = {
@@ -31,11 +32,12 @@ describe('mcp', () => {
     runMigrations(db);
   });
 
-  it('exports the 6 expected tools with consistent shape', () => {
-    expect(TOOLS).toHaveLength(6);
+  it('exports the 7 expected tools with consistent shape', () => {
+    expect(TOOLS).toHaveLength(7);
     const names = TOOLS.map((t) => t.name).sort();
     expect(names).toEqual(
       [
+        'get_schema',
         'read_active_program',
         'read_aggregate_stats',
         'read_history',
@@ -99,6 +101,18 @@ describe('mcp', () => {
     const res = await readAggregateStats.handler(db)({});
     const stats = JSON.parse(res.content[0].text);
     expect(stats.sessions_total).toBe(0);
+  });
+
+  it('get_schema returns parseable JSON with schemas + examples + notes', async () => {
+    const res = await getSchemaTool.handler(db)();
+    const payload = JSON.parse(res.content[0].text);
+    expect(payload.schemas.WorkoutProgram).toBeDefined();
+    expect(payload.schemas.UserProfile).toBeDefined();
+    expect(payload.schemas.SessionReport).toBeDefined();
+    expect(payload.examples.WorkoutProgram).toBeDefined();
+    expect(Array.isArray(payload.notes)).toBe(true);
+    expect(payload.notes.length).toBeGreaterThan(0);
+    expect(payload.schema_version).toBe('1.0.0');
   });
 });
 

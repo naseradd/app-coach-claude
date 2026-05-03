@@ -11,6 +11,7 @@ import { readActiveProgram } from './tools/readActiveProgram.js';
 import { pushProgram } from './tools/pushProgram.js';
 import { readHistory } from './tools/readHistory.js';
 import { readAggregateStats } from './tools/readAggregateStats.js';
+import { getSchemaTool } from './tools/getSchema.js';
 
 type McpToolResult =
   | { content: { type: 'text'; text: string }[] }
@@ -24,6 +25,7 @@ type McpTool = {
 };
 
 export const TOOLS: readonly McpTool[] = [
+  getSchemaTool,
   readProfile,
   updateProfile,
   readActiveProgram,
