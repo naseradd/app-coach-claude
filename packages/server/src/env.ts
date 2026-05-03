@@ -6,6 +6,8 @@ const EnvSchema = z.object({
   DB_PATH: z.string().default('./data/coach.db'),
   STATIC_DIR: z.string().default('./dist-web'),
   NODE_ENV: z.enum(['development', 'production', 'test']).default('development'),
+  // Public origin used in OAuth discovery JSON (issuer, endpoints).
+  PUBLIC_BASE_URL: z.string().url().default('https://coach-claude.fly.dev'),
 });
 
 export type Env = z.infer<typeof EnvSchema>;

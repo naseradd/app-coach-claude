@@ -14,6 +14,8 @@ import { eventsRoute } from './routes/events.js';
 import { activeSessionRoute } from './routes/active-session.js';
 import { mountMcp } from './mcp/handler.js';
 import { staticRoute } from './routes/static.js';
+import { oauthRoute } from './routes/oauth.js';
+import { discoveryRoute } from './routes/discovery.js';
 
 const env = loadEnv();
 const db = openDb(env.DB_PATH);
@@ -21,6 +23,11 @@ runMigrations(db);
 
 const app = new Hono();
 app.route('/health', healthRoute);
+
+// Public OAuth 2.0 + discovery for Claude.ai's MCP connector.
+// MUST be mounted before any bearer-auth middleware (Claude hits these unauthed).
+app.route('/', discoveryRoute(env.PUBLIC_BASE_URL));
+app.route('/', oauthRoute({ bearerToken: env.BEARER_TOKEN }));
 
 const api = new Hono();
 api.use('*', bearerAuth(env.BEARER_TOKEN));

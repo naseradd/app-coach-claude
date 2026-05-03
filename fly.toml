@@ -9,6 +9,7 @@ primary_region = "yyz"
   DB_PATH = "/data/coach.db"
   STATIC_DIR = "dist-web"
   NODE_ENV = "production"
+  PUBLIC_BASE_URL = "https://coach-claude.fly.dev"
 
 [mounts]
   source = "coach_data"
