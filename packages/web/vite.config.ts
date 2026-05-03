@@ -35,9 +35,30 @@ export default defineConfig({
       },
       workbox: {
         navigateFallback: '/index.html',
+        // Don't let SW catch server-side routes — must hit network so the
+        // server returns its real response (HTML form, JSON, etc.) rather
+        // than the cached SPA index.html.
+        navigateFallbackDenylist: [
+          /^\/api\//,
+          /^\/mcp/,
+          /^\/health/,
+          /^\/authorize/,
+          /^\/token/,
+          /^\/register/,
+          /^\/\.well-known\//,
+        ],
         runtimeCaching: [
           {
             urlPattern: ({ url }) => url.pathname.startsWith('/api/'),
+            handler: 'NetworkOnly',
+          },
+          {
+            urlPattern: ({ url }) =>
+              url.pathname.startsWith('/mcp') ||
+              url.pathname.startsWith('/authorize') ||
+              url.pathname.startsWith('/token') ||
+              url.pathname.startsWith('/register') ||
+              url.pathname.startsWith('/.well-known/'),
             handler: 'NetworkOnly',
           },
         ],
