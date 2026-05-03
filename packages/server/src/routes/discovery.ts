@@ -1,4 +1,5 @@
 import { Hono } from 'hono';
+import { cors } from 'hono/cors';
 
 /**
  * OAuth 2.0 + MCP discovery endpoints (RFC 8414 + MCP spec 2025-03-26).
@@ -10,11 +11,23 @@ import { Hono } from 'hono';
 export function discoveryRoute(baseUrl: string) {
   const r = new Hono();
 
+  // CORS: discovery is browser-readable from Claude.ai's connector wizard.
+  r.use(
+    '*',
+    cors({
+      origin: (origin) => origin || '*',
+      allowMethods: ['GET', 'OPTIONS'],
+      allowHeaders: ['Content-Type', 'Authorization'],
+      maxAge: 86400,
+    }),
+  );
+
   r.get('/.well-known/oauth-authorization-server', (c) =>
     c.json({
       issuer: baseUrl,
       authorization_endpoint: `${baseUrl}/authorize`,
       token_endpoint: `${baseUrl}/token`,
+      registration_endpoint: `${baseUrl}/register`,
       response_types_supported: ['code'],
       grant_types_supported: ['authorization_code'],
       code_challenge_methods_supported: ['S256'],

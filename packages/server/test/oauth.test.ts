@@ -81,6 +81,7 @@ describe('discovery', () => {
     expect(body.issuer).toBe(BASE);
     expect(body.authorization_endpoint).toBe(`${BASE}/authorize`);
     expect(body.token_endpoint).toBe(`${BASE}/token`);
+    expect(body.registration_endpoint).toBe(`${BASE}/register`);
     expect(body.code_challenge_methods_supported).toEqual(['S256']);
     expect(body.grant_types_supported).toContain('authorization_code');
   });
@@ -195,6 +196,7 @@ describe('POST /token', () => {
     expect(body.access_token).toBe(TOKEN);
     expect(body.token_type).toBe('Bearer');
     expect(body.expires_in).toBeGreaterThan(0);
+    expect(body.scope).toBe('mcp');
   });
 
   it('rejects wrong code_verifier with invalid_grant', async () => {
@@ -283,5 +285,52 @@ describe('POST /token', () => {
     expect(res.status).toBe(400);
     const body = await res.json();
     expect(body.error).toBe('invalid_grant');
+  });
+});
+
+describe('POST /register (RFC 7591)', () => {
+  beforeEach(() => _resetForTests());
+
+  it('returns 201 with a generated client_id when body is empty', async () => {
+    const app = buildApp();
+    const res = await app.request('/register', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: '{}',
+    });
+    expect(res.status).toBe(201);
+    const body = await res.json();
+    expect(typeof body.client_id).toBe('string');
+    expect(body.client_id.length).toBeGreaterThan(0);
+    expect(body.token_endpoint_auth_method).toBe('none');
+    expect(body.grant_types).toContain('authorization_code');
+    expect(body.response_types).toContain('code');
+    expect(typeof body.client_id_issued_at).toBe('number');
+  });
+
+  it('echoes redirect_uris back to the caller', async () => {
+    const app = buildApp();
+    const redirect_uris = ['https://claude.ai/api/mcp/auth_callback'];
+    const res = await app.request('/register', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ redirect_uris, application_type: 'native' }),
+    });
+    expect(res.status).toBe(201);
+    const body = await res.json();
+    expect(body.redirect_uris).toEqual(redirect_uris);
+    expect(body.application_type).toBe('native');
+  });
+
+  it('respects a caller-provided client_id', async () => {
+    const app = buildApp();
+    const res = await app.request('/register', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ client_id: 'claude-ai-mcp' }),
+    });
+    expect(res.status).toBe(201);
+    const body = await res.json();
+    expect(body.client_id).toBe('claude-ai-mcp');
   });
 });

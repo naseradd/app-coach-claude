@@ -1,6 +1,7 @@
 import { Hono } from 'hono';
 import { html } from 'hono/html';
-import { createHash, timingSafeEqual } from 'node:crypto';
+import { cors } from 'hono/cors';
+import { createHash, randomUUID, timingSafeEqual } from 'node:crypto';
 import {
   generateAuthCode,
   storeAuthCode,
@@ -25,6 +26,20 @@ interface OauthDeps {
  */
 export function oauthRoute(deps: OauthDeps) {
   const r = new Hono();
+
+  // CORS: Claude.ai may probe these endpoints from a browser context during
+  // the connector setup wizard. Public routes only — no credentials handled
+  // server-to-server (token / register accept body, not cookies).
+  r.use(
+    '*',
+    cors({
+      origin: (origin) => origin || '*',
+      allowMethods: ['GET', 'POST', 'OPTIONS'],
+      allowHeaders: ['Content-Type', 'Authorization'],
+      maxAge: 86400,
+    }),
+  );
+
   const expectedToken = Buffer.from(deps.bearerToken);
 
   // GET /authorize → render HTML form for the user to paste their bearer token.
@@ -170,7 +185,36 @@ export function oauthRoute(deps: OauthDeps) {
       access_token: deps.bearerToken,
       token_type: 'Bearer',
       expires_in: 31536000, // 1 year
+      scope: 'mcp',
     });
+  });
+
+  // POST /register → RFC 7591 Dynamic Client Registration.
+  // Claude.ai's MCP connector may auto-register a client before /authorize.
+  // We're single-user with PKCE — there's no real client secret to mint, so we
+  // accept anything and echo back a synthetic client_id + the metadata that
+  // confirms we're a public client (token_endpoint_auth_method=none).
+  r.post('/register', async (c) => {
+    const body = (await c.req.json().catch(() => ({}))) as Record<string, unknown>;
+    const client_id =
+      typeof body.client_id === 'string' && body.client_id.length > 0
+        ? body.client_id
+        : `mcp-${randomUUID()}`;
+    const redirect_uris = Array.isArray(body.redirect_uris) ? body.redirect_uris : [];
+    const application_type =
+      typeof body.application_type === 'string' ? body.application_type : 'web';
+    return c.json(
+      {
+        client_id,
+        client_id_issued_at: Math.floor(Date.now() / 1000),
+        grant_types: ['authorization_code'],
+        response_types: ['code'],
+        redirect_uris,
+        token_endpoint_auth_method: 'none',
+        application_type,
+      },
+      201,
+    );
   });
 
   return r;

@@ -1,5 +1,6 @@
 import { serve } from '@hono/node-server';
 import { Hono } from 'hono';
+import { logger } from 'hono/logger';
 import { loadEnv } from './env.js';
 import { openDb } from './db/connection.js';
 import { runMigrations } from './db/migrations.js';
@@ -22,6 +23,11 @@ const db = openDb(env.DB_PATH);
 runMigrations(db);
 
 const app = new Hono();
+
+// Request logger: prints `<-- METHOD /path` and `--> METHOD /path STATUS time`.
+// Captured by `flyctl logs` for diagnosing what Claude.ai's MCP connector calls.
+app.use('*', logger());
+
 app.route('/health', healthRoute);
 
 // Public OAuth 2.0 + discovery for Claude.ai's MCP connector.
