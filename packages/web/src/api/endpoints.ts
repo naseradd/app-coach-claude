@@ -16,6 +16,8 @@ export const apiClient = {
   getSession: (id: string) => api<SessionReport>(`/api/sessions/${id}`),
   postSession: (r: SessionReport) =>
     api<SessionReport>('/api/sessions', { method: 'POST', body: JSON.stringify(r) }),
+  deleteSession: (id: string) =>
+    api<undefined>(`/api/sessions/${id}`, { method: 'DELETE' }),
   setupStatus: () =>
     api<{ complete: boolean; missing: string[] }>('/api/setup-status'),
   wipe: () => api<{ ok: true }>('/api/data', { method: 'DELETE' }),

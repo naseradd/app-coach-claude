@@ -11,6 +11,7 @@ interface HistoryState {
   fetch: () => Promise<void>;
   fetchOne: (id: string) => Promise<SessionReport | null>;
   upsert: (r: SessionReport) => void;
+  remove: (id: string) => Promise<void>;
   reset: () => void;
 }
 
@@ -54,5 +55,16 @@ export const useHistory = create<HistoryState>((set, get) => ({
       reports: [r, ...s.reports.filter((x) => x.id !== r.id)],
       byId: { ...s.byId, [r.id]: r },
     })),
+  remove: async (id) => {
+    if (!isApiConfigured()) return;
+    await apiClient.deleteSession(id);
+    set((s) => {
+      const { [id]: _removed, ...byId } = s.byId;
+      return {
+        reports: s.reports.filter((r) => r.id !== id),
+        byId,
+      };
+    });
+  },
   reset: () => set({ reports: [], byId: {}, loading: false, error: null }),
 }));

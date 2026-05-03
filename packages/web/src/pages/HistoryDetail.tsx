@@ -1,8 +1,8 @@
 import { useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { Trophy } from 'lucide-react';
+import { Trophy, Trash2 } from 'lucide-react';
 import type { SessionReport } from '@coach/shared';
-import { Badge, Card, NavBar } from '../components/ui/index.js';
+import { Badge, Button, Card, IconButton, NavBar, Sheet } from '../components/ui/index.js';
 import { useHistory } from '../store/history.store.js';
 
 export function HistoryDetail() {
@@ -10,9 +10,28 @@ export function HistoryDetail() {
   const navigate = useNavigate();
   const fetchOne = useHistory((s) => s.fetchOne);
   const cached = useHistory((s) => (id ? s.byId[id] : undefined));
+  const removeReport = useHistory((s) => s.remove);
 
   const [report, setReport] = useState<SessionReport | null | undefined>(cached);
   const [loading, setLoading] = useState(!cached);
+  const [confirmOpen, setConfirmOpen] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
+
+  const onConfirmDelete = async () => {
+    if (!report) return;
+    setDeleting(true);
+    setDeleteError(null);
+    try {
+      await removeReport(report.id);
+      setConfirmOpen(false);
+      navigate('/history', { replace: true });
+    } catch (e) {
+      setDeleteError(e instanceof Error ? e.message : 'delete_failed');
+    } finally {
+      setDeleting(false);
+    }
+  };
 
   useEffect(() => {
     if (!id) return;
@@ -68,7 +87,16 @@ export function HistoryDetail() {
 
   return (
     <div style={{ paddingBottom: 24 }}>
-      <NavBar title={report.session_name} subtitle={datetime} onBack={() => navigate('/history')} />
+      <NavBar
+        title={report.session_name}
+        subtitle={datetime}
+        onBack={() => navigate('/history')}
+        trailing={
+          <IconButton ariaLabel="Supprimer cette archive" onClick={() => setConfirmOpen(true)}>
+            <Trash2 size={18} />
+          </IconButton>
+        }
+      />
 
       <div style={{ padding: '8px 20px', display: 'grid', gap: 16 }}>
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
@@ -199,6 +227,42 @@ export function HistoryDetail() {
           </Card>
         )}
       </div>
+
+      <Sheet open={confirmOpen} onClose={() => (deleting ? undefined : setConfirmOpen(false))}>
+        <div style={{ display: 'grid', gap: 12, padding: '4px 0 8px' }}>
+          <h3 className="t-title-2" style={{ margin: 0 }}>
+            Supprimer cette archive ?
+          </h3>
+          <p className="t-callout" style={{ color: 'var(--ink-3)', margin: 0 }}>
+            Cette séance sera retirée de ton historique. Action définitive.
+          </p>
+          {deleteError ? (
+            <p className="t-footnote" style={{ color: 'var(--danger)', margin: 0 }}>
+              {deleteError}
+            </p>
+          ) : null}
+          <div style={{ display: 'grid', gap: 10, marginTop: 4 }}>
+            <Button
+              variant="bordered"
+              size="lg"
+              fullWidth
+              disabled={deleting}
+              onClick={() => setConfirmOpen(false)}
+            >
+              Annuler
+            </Button>
+            <Button
+              variant="primary"
+              size="lg"
+              fullWidth
+              disabled={deleting}
+              onClick={onConfirmDelete}
+            >
+              {deleting ? 'Suppression…' : 'Supprimer'}
+            </Button>
+          </div>
+        </div>
+      </Sheet>
     </div>
   );
 }
