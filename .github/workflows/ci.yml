@@ -13,6 +13,8 @@ jobs:
       - uses: actions/setup-node@v4
         with: { node-version: 20, cache: pnpm }
       - run: pnpm install --frozen-lockfile
+      # Build shared first so server/web typecheck can resolve @coach/shared types
+      - run: pnpm --filter @coach/shared build
       - run: pnpm typecheck
       - run: pnpm test
       - run: pnpm build
