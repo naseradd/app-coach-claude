@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, Suspense } from 'react';
 import { Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { AnimatePresence } from 'motion/react';
 import { Dumbbell, Archive, User, type LucideIcon } from 'lucide-react';
@@ -7,6 +7,16 @@ import { PageTransition } from './PageTransition.js';
 import { useWorkout } from '../../store/workout.store.js';
 
 type ShellTabId = 'coach' | 'archives' | 'profile';
+
+function ShellLoader() {
+  return (
+    <div style={{ minHeight: '100dvh', display: 'grid', placeItems: 'center' }}>
+      <div className="t-footnote" style={{ color: 'var(--ink-3)' }}>
+        Chargement…
+      </div>
+    </div>
+  );
+}
 
 interface ShellTab extends TabConfig<ShellTabId> {
   route: string;
@@ -34,7 +44,9 @@ export function AppShell() {
   const navigate = useNavigate();
   const active = activeTabFor(location.pathname);
 
-  const isWorkout = location.pathname.startsWith('/workout');
+  const isImmersive =
+    location.pathname.startsWith('/workout') ||
+    location.pathname.startsWith('/session/');
 
   // Auto-resume: if useApiBoot restored an in-flight workout from the server,
   // pull the user into /workout once. We consume the flag immediately so the
@@ -59,15 +71,17 @@ export function AppShell() {
         maxWidth: 430,
         margin: '0 auto',
         position: 'relative',
-        paddingBottom: isWorkout ? 0 : 84,
+        paddingBottom: isImmersive ? 0 : 84,
       }}
     >
-      <AnimatePresence mode="wait">
-        <PageTransition key={location.pathname} routeKey={location.pathname}>
-          <Outlet />
-        </PageTransition>
-      </AnimatePresence>
-      {isWorkout ? null : (
+      <Suspense fallback={<ShellLoader />}>
+        <AnimatePresence mode="wait">
+          <PageTransition key={location.pathname} routeKey={location.pathname}>
+            <Outlet />
+          </PageTransition>
+        </AnimatePresence>
+      </Suspense>
+      {isImmersive ? null : (
         <TabBar<ShellTabId>
           active={active}
           tabs={TABS.map(({ id, label, icon }) => ({ id, label, icon }))}
