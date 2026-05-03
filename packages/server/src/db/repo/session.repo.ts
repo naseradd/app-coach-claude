@@ -45,3 +45,8 @@ export function getReport(db: DB, id: string): SessionReport | null {
   if (!row) return null;
   return JSON.parse(row.data_json) as SessionReport;
 }
+
+export function deleteReport(db: DB, id: string): boolean {
+  const info = db.prepare('DELETE FROM session_reports WHERE id = ?').run(id);
+  return info.changes > 0;
+}

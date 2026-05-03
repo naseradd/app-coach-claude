@@ -114,4 +114,85 @@ describe('sessions route', () => {
     const res = await app.request('/sessions?limit=abc');
     expect(res.status).toBe(400);
   });
+
+  it('DELETE removes the report', async () => {
+    const db = openDb(':memory:');
+    runMigrations(db);
+    pushProgram(db, {
+      schema_version: '1.0.0',
+      program: {
+        id: programId,
+        name: 'P',
+        generated_at: '2026-04-08T08:00:00Z',
+        generated_by: 't',
+        goal: 'strength',
+        notes: '',
+        duration_weeks: 4,
+        sessions_per_week: 3,
+      },
+      sessions: [
+        {
+          id: sessionId,
+          session_number: 1,
+          name: 'A',
+          estimated_duration_minutes: 60,
+          tags: [],
+          blocks: [
+            {
+              id: 'b',
+              name: 'B',
+              type: 'strength',
+              notes: '',
+              exercises: [
+                {
+                  id: exerciseId,
+                  order: 1,
+                  name: 'Bench',
+                  category: 'compound',
+                  muscle_groups_primary: ['chest'],
+                  muscle_groups_secondary: [],
+                  equipment: ['barbell'],
+                  sets: [
+                    {
+                      set_number: 1,
+                      type: 'working',
+                      reps: 5,
+                      reps_min: null,
+                      reps_max: null,
+                      weight_kg: 80,
+                      weight_unit: 'kg',
+                      rpe_target: 8,
+                      duration_seconds: null,
+                      rest_seconds: 180,
+                      notes: '',
+                    },
+                  ],
+                  coaching_cues: [],
+                  progression_note: null,
+                  alternatives: [],
+                },
+              ],
+            },
+          ],
+        },
+      ],
+    });
+    const app = new Hono().route('/sessions', sessionsRoute(db));
+
+    const post = await app.request('/sessions', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify(sampleReport),
+    });
+    expect(post.status).toBe(201);
+
+    const del = await app.request(`/sessions/${reportId}`, { method: 'DELETE' });
+    expect(del.status).toBe(204);
+
+    const get = await app.request(`/sessions/${reportId}`);
+    expect(get.status).toBe(404);
+
+    const delAgain = await app.request(`/sessions/${reportId}`, { method: 'DELETE' });
+    expect(delAgain.status).toBe(404);
+  });
 });

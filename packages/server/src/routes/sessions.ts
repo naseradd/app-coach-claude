@@ -2,7 +2,12 @@ import { Hono } from 'hono';
 import { z } from 'zod';
 import { SessionReport } from '@coach/shared';
 import type { DB } from '../db/connection.js';
-import { insertReport, listReports, getReport } from '../db/repo/session.repo.js';
+import {
+  insertReport,
+  listReports,
+  getReport,
+  deleteReport,
+} from '../db/repo/session.repo.js';
 import { eventBus } from '../events/bus.js';
 
 const ListQuery = z.object({
@@ -39,6 +44,14 @@ export function sessionsRoute(db: DB) {
     const saved = insertReport(db, parsed.data);
     eventBus.publish({ type: 'history_changed', report_id: saved.id });
     return c.json(saved, 201);
+  });
+
+  r.delete('/:id', (c) => {
+    const id = c.req.param('id');
+    const ok = deleteReport(db, id);
+    if (!ok) return c.json({ error: 'not_found' }, 404);
+    eventBus.publish({ type: 'history_changed', report_id: id });
+    return c.body(null, 204);
   });
 
   return r;
