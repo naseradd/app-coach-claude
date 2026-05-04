@@ -30,6 +30,7 @@ import type {
 import { SessionReport as SessionReportSchema } from '@coach/shared';
 import { RestTimer } from './RestTimer.js';
 import { PostSession } from './PostSession.js';
+import { TimedSetRunner } from '../components/workout/TimedSetRunner.js';
 import { useProgram } from '../store/program.store.js';
 import { useHistory } from '../store/history.store.js';
 import {
@@ -368,6 +369,42 @@ function WorkoutInner({ program, session }: InnerProps) {
     .reverse()
     .find((s) => s.exercise_id === currentExercise.id);
 
+  const isTimed =
+    currentSet.type === 'timed' ||
+    (currentSet.duration_seconds !== null && currentSet.reps === null);
+
+  const completeTimedSet = (elapsed: number) => {
+    if (!currentExercise || !currentSet) return;
+    haptics('success');
+    const entry: SetLogEntry = {
+      exercise_id: currentExercise.id,
+      exercise_name: currentExercise.name,
+      set_number: currentSet.set_number,
+      type: currentSet.type,
+      planned_reps: currentSet.reps,
+      planned_weight_kg: currentSet.weight_kg,
+      rpe_planned: currentSet.rpe_target,
+      rest_planned_seconds: currentSet.rest_seconds,
+      actual_reps: null,
+      actual_weight_kg: null,
+      rpe_actual: null,
+      rest_taken_seconds: 0,
+      duration_seconds: elapsed,
+      completed: true,
+      is_pr: false,
+      notes: '',
+    };
+    logSet(entry);
+    const isLastSet =
+      exerciseIndex + 1 >= totalExercises && setIndex + 1 >= currentExercise.sets.length;
+    if (isLastSet) {
+      advanceSet(currentExercise.sets.length, totalExercises);
+      return;
+    }
+    if (currentSet.rest_seconds > 0) startRest();
+    else advanceSet(currentExercise.sets.length, totalExercises);
+  };
+
   return (
     <div style={{ minHeight: '100dvh', background: 'var(--bg-canvas)' }}>
       {/* Sticky top bar */}
@@ -500,6 +537,12 @@ function WorkoutInner({ program, session }: InnerProps) {
         </Card>
 
         {/* Set focus */}
+        {isTimed ? (
+          <TimedSetRunner
+            targetSeconds={currentSet.duration_seconds ?? 60}
+            onComplete={completeTimedSet}
+          />
+        ) : (
         <Card variant="surface" padding={16}>
           <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12 }}>
             <div>
@@ -574,9 +617,11 @@ function WorkoutInner({ program, session }: InnerProps) {
             </motion.div>
           ) : null}
         </Card>
+        )}
       </div>
 
-      {/* Sticky bottom CTA */}
+      {/* Sticky bottom CTA — hidden in timed mode (TimedSetRunner has its own button) */}
+      {!isTimed ? (
       <div
         style={{
           position: 'fixed',
@@ -603,6 +648,7 @@ function WorkoutInner({ program, session }: InnerProps) {
           Valider · {reps} reps
         </Button>
       </div>
+      ) : null}
 
       {/* Rest timer */}
       <RestTimer

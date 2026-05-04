@@ -257,10 +257,16 @@ function ExerciseSheetBody({ exercise }: { exercise: Exercise }) {
                     {s.type === 'warmup' ? <span style={{ color: 'var(--ink-4)' }}> w</span> : null}
                   </td>
                   <td className="t-footnote tabular" style={{ padding: '10px 12px' }}>
-                    {s.reps ?? (s.reps_min ? `${s.reps_min}+` : '—')}
+                    {s.duration_seconds != null
+                      ? `${s.duration_seconds}s`
+                      : s.reps ?? (s.reps_min ? `${s.reps_min}+` : '—')}
                   </td>
                   <td className="t-footnote tabular" style={{ padding: '10px 12px' }}>
-                    {s.weight_kg ? `${s.weight_kg}${s.weight_unit}` : '—'}
+                    {s.duration_seconds != null
+                      ? '—'
+                      : s.weight_kg
+                      ? `${s.weight_kg}${s.weight_unit}`
+                      : '—'}
                   </td>
                   <td className="t-footnote tabular" style={{ padding: '10px 12px' }}>
                     {s.rpe_target ?? '—'}
