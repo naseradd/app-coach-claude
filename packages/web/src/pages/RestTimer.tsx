@@ -100,6 +100,7 @@ export function RestTimer({
           animate={{ y: 0 }}
           exit={{ y: '100%' }}
           transition={{ type: 'spring', stiffness: 260, damping: 28 }}
+          data-testid="rest-timer"
           style={{
             position: 'fixed',
             inset: 0,
@@ -223,17 +224,25 @@ export function RestTimer({
 
           {/* Next-up card */}
           {nextExercise && nextSet ? (
-            <div style={{ padding: '0 20px 12px' }}>
+            <div style={{ padding: '0 20px 12px' }} data-testid="rest-next-up">
               <Card variant="surface" padding={14}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <div className="t-caption" style={{ color: 'var(--ink-3)' }}>
                       à suivre
                     </div>
-                    <div className="t-headline" style={{ color: 'var(--ink)', marginTop: 2 }}>
+                    <div
+                      className="t-headline"
+                      style={{ color: 'var(--ink)', marginTop: 2 }}
+                      data-testid="rest-next-up-name"
+                    >
                       {nextExercise.name}
                     </div>
-                    <div className="t-footnote tabular" style={{ color: 'var(--ink-3)', marginTop: 2 }}>
+                    <div
+                      className="t-footnote tabular"
+                      style={{ color: 'var(--ink-3)', marginTop: 2 }}
+                      data-testid="rest-next-up-set"
+                    >
                       Set {nextSet.set_number} · {nextSet.reps ?? '—'} reps · {nextSet.weight_kg ?? 0}
                       {nextSet.weight_unit}
                     </div>
@@ -251,10 +260,21 @@ export function RestTimer({
           {/* Actions */}
           <div style={{ padding: '0 20px 16px', display: 'grid', gap: 10 }}>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
-              <Button variant="tinted" size="lg" leadingIcon={<Plus size={16} />} onClick={onAdd30}>
+              <Button
+                variant="tinted"
+                size="lg"
+                leadingIcon={<Plus size={16} />}
+                onClick={onAdd30}
+                data-testid="rest-add-30"
+              >
                 +30s
               </Button>
-              <Button variant="tinted" size="lg" onClick={onSkip}>
+              <Button
+                variant="tinted"
+                size="lg"
+                onClick={onSkip}
+                data-testid="rest-skip"
+              >
                 Skip repos
               </Button>
             </div>
@@ -264,6 +284,7 @@ export function RestTimer({
               fullWidth
               trailingIcon={<ArrowRight size={18} />}
               onClick={onComplete}
+              data-testid="rest-done"
             >
               Prêt — set suivant
             </Button>

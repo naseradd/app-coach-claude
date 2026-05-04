@@ -139,7 +139,7 @@ export function PostSession({
   }
 
   return (
-    <div style={{ paddingBottom: 120 }}>
+    <div data-testid="post-session" style={{ paddingBottom: 120 }}>
       <div style={{ paddingTop: 'env(safe-area-inset-top)' }} />
       <header style={{ padding: '32px 20px 16px' }}>
         <h1 className="t-large" style={{ margin: 0, color: 'var(--ink)' }}>

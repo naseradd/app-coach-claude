@@ -471,7 +471,11 @@ function WorkoutInner({ program, session }: InnerProps) {
         {/* Exercise card */}
         <Card variant="surface" padding={16}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-            <h2 className="t-title-2" style={{ margin: 0, color: 'var(--ink)', flex: 1 }}>
+            <h2
+              className="t-title-2"
+              style={{ margin: 0, color: 'var(--ink)', flex: 1 }}
+              data-testid="exercise-name"
+            >
               {currentExercise.name}
             </h2>
             {currentItem &&
@@ -557,13 +561,14 @@ function WorkoutInner({ program, session }: InnerProps) {
           />
         ) : (
         <Card variant="surface" padding={16}>
-          <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12 }}>
+          <div data-testid="set-current" style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12 }}>
             <div>
               <div className="t-caption" style={{ color: 'var(--ink-3)', textTransform: 'lowercase' }}>
                 set en cours
               </div>
               <div
                 className="tabular"
+                data-testid="set-current-number"
                 style={{ fontSize: 56, fontWeight: 600, lineHeight: 1, color: 'var(--ink)', marginTop: 2 }}
               >
                 {setNumberInExercise}/{totalSetsInExercise}
@@ -657,6 +662,7 @@ function WorkoutInner({ program, session }: InnerProps) {
           fullWidth
           leadingIcon={<CheckCircle2 size={18} />}
           onClick={validateSet}
+          data-testid="validate-set"
         >
           Valider · {reps} reps
         </Button>

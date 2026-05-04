@@ -16,6 +16,7 @@ interface Props {
   onClick?: () => void;
   children: ReactNode;
   className?: string;
+  'data-testid'?: string;
 }
 
 const heightOf: Record<ButtonSize, number> = { sm: 32, md: 40, lg: 48, xl: 56 };
@@ -48,6 +49,7 @@ export function Button({
   onClick,
   children,
   className,
+  'data-testid': testId,
 }: Props) {
   return (
     <motion.button
@@ -57,6 +59,7 @@ export function Button({
       whileTap={disabled ? undefined : { scale: 0.97 }}
       transition={spring.tap}
       className={className}
+      data-testid={testId}
       style={{
         height: heightOf[size],
         padding: paddingOf[size],

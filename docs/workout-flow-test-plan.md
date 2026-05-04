@@ -100,56 +100,58 @@ After tapping "Prêt — set suivant" or "Skip repos", the overlay must **close*
 
 ## Vitest coverage (current)
 
-`packages/web/test/workoutStore.test.ts` — 9 tests covering R-1, R-2, R-3, R-4, R-5 plus advanceSet branches. Run via `npm test --workspace @coach/web`.
+`packages/web/test/workoutStore.test.ts` — 9 tests covering R-1, R-2, R-3, R-4, R-5 plus advanceSet branches. Run via `pnpm test --filter @coach/web`.
 
 `packages/web/test/flatPlan.test.ts` — 5 tests covering R-7 cursor build (strength sequential, superset interleave, circuit, mixed blocks, mismatched set counts).
 
 ---
 
-## Future E2E (Playwright) — recommended scenarios
+## Playwright E2E coverage (current)
 
-Project does not yet have Playwright. When added (recommended infra: `@playwright/test` in `packages/web`, fixture that boots the server with an in-memory DB), the following click-through scenarios cover the runner end-to-end:
+`packages/web/e2e/workout-flow.spec.ts` — 6 specs running against `vite preview` with all `/api/*`, `/health`, and `/api/events` calls mocked via `page.route()` (no real backend). Bypasses onboarding by seeding `localStorage` (`coach.settings`) in `addInitScript`.
 
-### E2E-1 — Strength block, full happy path
-1. Seed DB with a 1-session program (1 exercise, 3 working sets, rest 60s each).
-2. Start session via Today screen.
-3. For each set: assert exercise card visible → tap "Valider" → assert RestTimer visible with correct "à suivre" → wait/skip → assert RestTimer closed AND next set's `set en cours` shows `N/3`.
-4. After last set: assert PostSession screen.
+Run via `pnpm test:e2e --filter @coach/web` (or interactive UI: `pnpm test:e2e:ui`).
 
-**Critical assertions to prevent R-1:**
-- After `Skip repos` click, locator for `[data-testid=rest-timer]` becomes hidden.
-- Locator for `[data-testid=set-current]` shows the new set number (not the one that was previewed in "à suivre").
+| Spec | Covers | Asserts |
+|------|--------|---------|
+| R-1 regression | Skip repos must close overlay AND show next exercise card | `rest-timer` hidden, `set-current-number` advanced |
+| R-2 | "Prêt — set suivant" same as Skip | overlay closes, cursor advances |
+| Happy path | 3 sets × 1 exercise → PostSession | full sequence, no `rest-timer` flash on final set |
+| R-3 final-set | 1-set program → direct PostSession | `post-session` visible, no rest |
+| R-7 superset | A1→B1→A2→B2 interleave | `exercise-name` alternates between Bench/Row each set |
+| Next-up correctness | Rest preview shows the *next* set, not the current one | `rest-next-up-set` text matches expected set_number |
 
-### E2E-2 — Superset interleave
-1. Seed program with a superset block (Ex A 3×, Ex B 3×).
-2. Walk through 6 set validations: A1, B1, A2, B2, A3, B3.
-3. After each, assert exercise name on the card matches the expected order.
-
-### E2E-3 — Timed set (cardio)
-1. Seed program with a `cardio` block, `timed` set, `duration_seconds: 30`.
-2. Start session, assert TimedSetRunner present (no Reps stepper).
-3. Wait for countdown OR tap "Terminé" → assert next state.
-
-### E2E-4 — Resume mid-rest
-1. Start session, validate set 1.
-2. While rest overlay is open, navigate away and reload.
-3. Assert rest overlay reappears with the **remaining** time (not the full target), and `à suivre` preview still references the correct next set.
-
-### E2E-5 — Final-set transition
-1. Seed 1-exercise, 1-set program.
-2. Validate the set.
-3. Assert no RestTimer flash; PostSession appears immediately.
-
-### Suggested data-testid hooks (to add when E2E lands)
-- `data-testid="rest-timer"` on the RestTimer root
-- `data-testid="set-current"` on the "set en cours" block
-- `data-testid="next-up"` on the rest overlay's preview card
-- `data-testid="validate-set"` on the bottom CTA
-- `data-testid="rest-skip"` and `data-testid="rest-done"` on rest actions
+### data-testid hooks landed
+- `rest-timer` (overlay root)
+- `rest-next-up`, `rest-next-up-name`, `rest-next-up-set` (preview card)
+- `rest-add-30`, `rest-skip`, `rest-done` (overlay actions)
+- `set-current`, `set-current-number` (active-set card)
+- `exercise-name` (exercise heading)
+- `validate-set` (bottom CTA)
+- `post-session` (done screen root)
 
 ---
 
-## Manual smoke (until E2E lands)
+## Future E2E — recommended additions
+
+### E2E-Future-1 — Timed set (cardio/iso)
+Seed a `cardio` block with a `timed` set (`duration_seconds: 30`). Assert `TimedSetRunner` renders (no reps stepper), countdown completes or tap "Terminé" → rest → next.
+
+### E2E-Future-2 — Resume mid-rest
+Mock `GET /api/active-session` to return `{ phase: 'rest', restStartedAt, setsLog: [...], exerciseIndex, setIndex, ... }`. Navigate to `/`, expect AppShell auto-redirect into `/#/workout?...&resume=1`. Assert overlay reappears with **remaining** time (not full target) and `rest-next-up-set` still correct.
+
+### E2E-Future-3 — +30s extends rest target
+Tap `rest-add-30`, assert displayed target updates (extract a testid for the displayed `objectif · MM:SS` text first).
+
+### E2E-Future-4 — Skip exercise (more sheet)
+Open the "more" sheet, tap Skip exercise, assert cursor jumps to the next exercise (not next set).
+
+### E2E-Future-5 — Final report submission
+After PostSession, fill overall feeling + notes, tap submit, assert `POST /api/sessions` was called with valid payload (use the route handler's captured `postedSessions` array in fixtures).
+
+---
+
+## Manual smoke
 
 Before each release, walk through:
 1. Strength session, 2 exercises, 3 sets each: validate → rest → assert exercise card visible after rest, **not** the rest preview.

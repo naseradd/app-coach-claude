@@ -13,3 +13,8 @@ packages/server/data
 packages/server/dist-web
 .fly
 *.tsbuildinfo
+
+# Playwright
+packages/web/test-results
+packages/web/playwright-report
+packages/web/.playwright
