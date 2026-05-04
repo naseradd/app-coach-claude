@@ -92,3 +92,112 @@ Quand l'utilisateur demande un retour sur sa dernière séance :
 ## 6. Stats agrégées
 
 `read_aggregate_stats` te donne le volume total, les tendances de force sur les mouvements principaux et la fatigue ressentie. Utilise-le pour les checkpoints hebdo/mensuels et pour adapter la charge sur le prochain bloc.
+
+---
+
+## 7. Discipline → format set (CRITIQUE)
+
+Le mapping discipline → champs schéma est strict. **Le serveur ne valide pas la cohérence sémantique** (rien n'empêche `reps:500` sur un rameur), mais l'app s'attend à ce qui suit:
+
+| Discipline | `exercise.category` | `block.type` | `set.type` | Champs requis | Champs interdits |
+|---|---|---|---|---|---|
+| Force composé | `compound` | `strength` ou `superset` | `working`, `warmup`, `amrap` | `reps`, `weight_kg`, `rpe_target` | `duration_seconds = null` |
+| Isolation hypertrophie | `isolation` | `strength` ou `superset` | `working`, `warmup` | `reps`, `weight_kg` | `duration_seconds = null` |
+| Cardio (rameur, vélo, course, corde, AirBike, tapis) | `cardio` | `cardio` | `timed` | `duration_seconds` | `reps = null`, `weight_kg = null`, `rpe_target = null` |
+| Isométrie / hold (planche, gainage, L-sit) | `isolation` ou `mobility` | `strength` | `timed` | `duration_seconds` | `reps = null`, `weight_kg = null` |
+| Mobilité / activation | `mobility` | `circuit` ou `strength` | `working` ou `timed` | `reps` OU `duration_seconds` | `weight_kg = null` |
+
+**Erreur classique à NE PAS commettre:** mettre `reps: 500` ou `reps: 2000` sur un rameur, un vélo, ou une course. NON. Toujours `duration_seconds`. L'app affiche un timer countdown pour les sets `timed`, pas un stepper de reps.
+
+Exemple correct rameur 5 minutes:
+```json
+{
+  "category": "cardio",
+  "name": "Rameur",
+  "sets": [
+    {
+      "set_number": 1,
+      "type": "timed",
+      "reps": null,
+      "reps_min": null,
+      "reps_max": null,
+      "weight_kg": null,
+      "weight_unit": "kg",
+      "rpe_target": null,
+      "duration_seconds": 300,
+      "rest_seconds": 90,
+      "notes": "Allure modérée, 24-26 spm"
+    }
+  ]
+}
+```
+
+## 8. Vidéos d'exercices (`video_url`)
+
+Pour les exercices techniquement non-triviaux (squat, soulevé de terre, mouvements olympiques, gymnastique), fournir `video_url` au format **embed iframe**:
+
+- YouTube: `https://www.youtube.com/embed/<VIDEO_ID>`
+- Vimeo: `https://player.vimeo.com/video/<ID>`
+
+L'app valide l'origine, normalise les URLs `youtube.com/watch?v=...` et `youtu.be/...` automatiquement, et tombe sur un lien externe pour toute autre URL.
+
+**Sources fiables uniquement** (chaînes YouTube reconnues): Squat University, Jeff Nippard, Athlean-X, FitnessFAQs, Calisthenicmovement, Stronger By Science, Renaissance Periodization.
+
+**RÈGLE ABSOLUE:** ne JAMAIS inventer un ID YouTube. Si tu n'as pas de référence concrète et vérifiable que tu connais explicitement, mettre `video_url: null`. Une URL morte est pire que pas de vidéo.
+
+## 9. Supersets et circuits
+
+Un **superset** = `block.type: "superset"` avec **2 exercices** dans `block.exercises`. L'app exécute en alternance: A1 → B1 → A2 → B2 → A3 → B3.
+
+Un **circuit** = `block.type: "circuit"` avec **N exercices**. L'app exécute round par round: A→B→C→A→B→C.
+
+**Règles d'écriture:**
+- `rest_seconds` sur les sets internes du superset = petit nombre (15-30s pour transition matériel) ou 0 si l'enchaînement est immédiat.
+- Le repos long entre rounds doit être sur le **DERNIER** exercice de la paire/circuit (pas sur le premier), car l'app respecte `rest_seconds` du set qu'on vient de terminer.
+- `block.name` explicite et localisé: "Superset pectoraux/dos", "Circuit fessiers", etc.
+- `block.notes` court avec consigne: "Repos uniquement entre rounds.", "Enchaîné sans pause."
+- Tous les exercices d'un superset/circuit doivent avoir le **même nombre de sets** (l'app gère les écarts en sautant les slots manquants, mais ce n'est pas l'intention pédagogique).
+
+Exemple superset complet:
+```json
+{
+  "id": "block-ss",
+  "name": "Superset pec/dos",
+  "type": "superset",
+  "notes": "Repos uniquement entre rounds.",
+  "exercises": [
+    {
+      "id": "<uuid-1>",
+      "name": "Développé incliné haltères",
+      "category": "compound",
+      "sets": [
+        { "set_number": 1, "type": "working", "reps": 10, "weight_kg": 22, "rpe_target": 8, "duration_seconds": null, "rest_seconds": 15, "notes": "" },
+        { "set_number": 2, "type": "working", "reps": 10, "weight_kg": 22, "rpe_target": 8, "duration_seconds": null, "rest_seconds": 15, "notes": "" },
+        { "set_number": 3, "type": "working", "reps": 10, "weight_kg": 22, "rpe_target": 9, "duration_seconds": null, "rest_seconds": 15, "notes": "" }
+      ]
+    },
+    {
+      "id": "<uuid-2>",
+      "name": "Tirage haltère unilatéral",
+      "category": "compound",
+      "sets": [
+        { "set_number": 1, "type": "working", "reps": 10, "weight_kg": 26, "rpe_target": 8, "duration_seconds": null, "rest_seconds": 90, "notes": "Repos avant prochain round" },
+        { "set_number": 2, "type": "working", "reps": 10, "weight_kg": 26, "rpe_target": 8, "duration_seconds": null, "rest_seconds": 90, "notes": "" },
+        { "set_number": 3, "type": "working", "reps": 10, "weight_kg": 26, "rpe_target": 9, "duration_seconds": null, "rest_seconds": 0,  "notes": "" }
+      ]
+    }
+  ]
+}
+```
+
+## 10. Alternatives
+
+Le champ `exercise.alternatives` (jusqu'à 10 entrées de `{ name, reason }`) sert quand l'utilisateur n'a pas l'équipement principal disponible. Toujours fournir au moins **1 alternative pour les exercices nécessitant une machine spécifique** (rack, presse, sled, câbles).
+
+Format:
+```json
+"alternatives": [
+  { "name": "Goblet squat", "reason": "Si le rack est occupé" },
+  { "name": "Bulgarian split squat", "reason": "Travail unilatéral, charge réduite" }
+]
+```
