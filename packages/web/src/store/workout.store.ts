@@ -179,13 +179,16 @@ export const useWorkout = create<WorkoutState>((set, get) => {
     },
 
     endRest: () => {
-      const { restStartedAt } = get();
-      if (!restStartedAt) return 0;
-      const elapsed = Math.max(
-        0,
-        Math.round((Date.now() - new Date(restStartedAt).getTime()) / 1000),
-      );
-      set({ restStartedAt: null });
+      const { restStartedAt, phase } = get();
+      const elapsed = restStartedAt
+        ? Math.max(
+            0,
+            Math.round((Date.now() - new Date(restStartedAt).getTime()) / 1000),
+          )
+        : 0;
+      // Ending rest is a state-machine invariant: phase must leave 'rest'.
+      // Caller decides 'set' vs 'done' afterward (advanceToNext may flip to 'done').
+      set({ restStartedAt: null, phase: phase === 'rest' ? 'set' : phase });
       debouncedSync();
       return elapsed;
     },
