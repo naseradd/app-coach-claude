@@ -88,57 +88,104 @@ export function SessionDetail() {
           </Card>
         ) : null}
 
-        {/* Exercises list */}
+        {/* Plan grouped by block */}
         <div>
           <div
             className="t-subhead"
-            style={{
-              color: 'var(--ink-3)',
-              textTransform: 'lowercase',
-              padding: '0 4px 8px',
-            }}
+            style={{ color: 'var(--ink-3)', textTransform: 'lowercase', padding: '0 4px 8px' }}
           >
-            exercices
+            plan
           </div>
-          <ListGroup>
-            {exercises.map((ex, i) => {
-              const heaviest = Math.max(...ex.sets.map((s) => s.weight_kg ?? 0));
-              const muscles = ex.muscle_groups_primary.slice(0, 3).join(', ');
+          <div style={{ display: 'grid', gap: 16 }}>
+            {session.blocks.map((block) => {
+              const isInterleaved = block.type === 'superset' || block.type === 'circuit';
               return (
-                <motion.div
-                  key={ex.id}
-                  initial={{ opacity: 0, y: 6 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ duration: 0.2, delay: 0.03 * i, ease: 'easeOut' }}
-                >
-                  <ListRow
-                    label={ex.name}
-                    subtitle={
-                      <span className="tabular">
-                        {ex.sets.length} sets · {muscles}
-                        {heaviest > 0 ? ` · top ${heaviest}kg` : ''}
-                      </span>
-                    }
-                    trailing={
-                      ex.video_url ? (
-                        <IconButton
-                          ariaLabel={`Vidéo de ${ex.name}`}
-                          onClick={(e?: any) => {
-                            e?.stopPropagation?.();
-                            setOpenExercise(ex);
-                          }}
+                <div key={block.id}>
+                  <div
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: 8,
+                      padding: '0 4px 6px',
+                    }}
+                  >
+                    <span className="t-subhead" style={{ color: 'var(--ink-2)' }}>
+                      {block.name}
+                    </span>
+                    {isInterleaved ? (
+                      <Badge variant="accent">
+                        {block.type === 'superset' ? 'Superset' : 'Circuit'}
+                      </Badge>
+                    ) : null}
+                  </div>
+                  {block.notes ? (
+                    <div
+                      className="t-footnote"
+                      style={{ color: 'var(--ink-3)', padding: '0 4px 8px' }}
+                    >
+                      {block.notes}
+                    </div>
+                  ) : null}
+                  <ListGroup>
+                    {block.exercises.map((ex, i) => {
+                      const heaviest = Math.max(...ex.sets.map((s) => s.weight_kg ?? 0));
+                      const muscles = ex.muscle_groups_primary.slice(0, 3).join(', ');
+                      return (
+                        <motion.div
+                          key={ex.id}
+                          initial={{ opacity: 0, y: 6 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          transition={{ duration: 0.2, delay: 0.03 * i, ease: 'easeOut' }}
                         >
-                          <Video size={16} />
-                        </IconButton>
-                      ) : null
-                    }
-                    showChevron
-                    onClick={() => setOpenExercise(ex)}
-                  />
-                </motion.div>
+                          <ListRow
+                            label={
+                              isInterleaved ? (
+                                <span>
+                                  <span
+                                    style={{
+                                      color: 'var(--accent)',
+                                      marginRight: 6,
+                                      fontWeight: 600,
+                                    }}
+                                  >
+                                    {String.fromCharCode(65 + i)}
+                                  </span>
+                                  {ex.name}
+                                </span>
+                              ) : (
+                                ex.name
+                              )
+                            }
+                            subtitle={
+                              <span className="tabular">
+                                {ex.sets.length} sets · {muscles}
+                                {heaviest > 0 ? ` · top ${heaviest}kg` : ''}
+                              </span>
+                            }
+                            trailing={
+                              ex.video_url ? (
+                                <IconButton
+                                  ariaLabel={`Vidéo de ${ex.name}`}
+                                  onClick={(e?: any) => {
+                                    e?.stopPropagation?.();
+                                    setOpenExercise(ex);
+                                  }}
+                                >
+                                  <Video size={16} />
+                                </IconButton>
+                              ) : null
+                            }
+                            showChevron
+                            onClick={() => setOpenExercise(ex)}
+                          />
+                        </motion.div>
+                      );
+                    })}
+                  </ListGroup>
+                </div>
               );
             })}
-          </ListGroup>
+          </div>
         </div>
       </div>
 

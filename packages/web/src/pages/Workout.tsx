@@ -24,7 +24,6 @@ import {
 import type {
   Exercise,
   SessionDef,
-  WorkSet,
   SessionReport as SessionReportType,
 } from '@coach/shared';
 import { SessionReport as SessionReportSchema } from '@coach/shared';
@@ -32,6 +31,7 @@ import { RestTimer } from './RestTimer.js';
 import { PostSession } from './PostSession.js';
 import { TimedSetRunner } from '../components/workout/TimedSetRunner.js';
 import { VideoFrame } from '../components/workout/VideoFrame.js';
+import { buildFlatPlan, type FlatPlanItem } from '../utils/flatPlan.js';
 import { useProgram } from '../store/program.store.js';
 import { useHistory } from '../store/history.store.js';
 import {
@@ -43,13 +43,6 @@ import { useWakeLock } from '../hooks/useWakeLock.js';
 import { useHaptics } from '../hooks/useHaptics.js';
 import { detectPr } from '../utils/prDetect.js';
 import { apiClient } from '../api/endpoints.js';
-
-interface FlatItem {
-  exercise: Exercise;
-  setIndex: number;
-  set: WorkSet;
-  globalCursor: number;
-}
 
 export function Workout() {
   const [params] = useSearchParams();
@@ -129,33 +122,27 @@ function WorkoutInner({ program, session }: InnerProps) {
   const startRest = useWorkout((s) => s.startRest);
   const endRest = useWorkout((s) => s.endRest);
   const updateLastSetRest = useWorkout((s) => s.updateLastSetRest);
-  const advanceSet = useWorkout((s) => s.advanceSet);
   const setExerciseSetIndex = useWorkout((s) => s.setExerciseSetIndex);
+  const setPhase = useWorkout((s) => s.setPhase);
 
   const haptics = useHaptics();
 
   // Wake lock active for the whole workout (not during 'done' / submitted).
   useWakeLock(programIdInStore !== null && phase !== 'done');
 
-  // Resolve flat plan grouped by exercise index → set index ----------------
+  // Resolve flat plan — interleaved by superset/circuit blocks ------------
+  const flatPlan: FlatPlanItem[] = useMemo(() => buildFlatPlan(session), [session]);
   const exercisesFlat: Exercise[] = useMemo(() => {
-    const out: Exercise[] = [];
-    for (const block of session.blocks) {
-      for (const exercise of block.exercises) out.push(exercise);
+    const seen = new Set<string>();
+    const list: Exercise[] = [];
+    for (const item of flatPlan) {
+      if (!seen.has(item.exercise.id)) {
+        seen.add(item.exercise.id);
+        list.push(item.exercise);
+      }
     }
-    return out;
-  }, [session]);
-
-  const flatPlan: FlatItem[] = useMemo(() => {
-    const out: FlatItem[] = [];
-    let cursor = 0;
-    for (const exercise of exercisesFlat) {
-      exercise.sets.forEach((set, i) => {
-        out.push({ exercise, setIndex: i, set, globalCursor: cursor++ });
-      });
-    }
-    return out;
-  }, [exercisesFlat]);
+    return list;
+  }, [flatPlan]);
 
   const totalSets = flatPlan.length;
   const totalExercises = exercisesFlat.length;
@@ -188,16 +175,19 @@ function WorkoutInner({ program, session }: InnerProps) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Current item -----------------------------------------------------------
-  const currentExercise = exercisesFlat[exerciseIndex] ?? null;
-  const currentSet = currentExercise?.sets[setIndex] ?? null;
+  // Current item — driven by interleaved flatPlan cursor -------------------
   const cursor = useMemo(() => {
-    if (!currentExercise || !currentSet) return 0;
-    return flatPlan.findIndex(
-      (p) => p.exercise.id === currentExercise.id && p.setIndex === setIndex,
+    const ex = exercisesFlat[exerciseIndex];
+    if (!ex) return 0;
+    const idx = flatPlan.findIndex(
+      (p) => p.exercise.id === ex.id && p.setIndex === setIndex,
     );
-  }, [currentExercise, currentSet, setIndex, flatPlan]);
-  const nextItem = cursor + 1 < flatPlan.length ? flatPlan[cursor + 1] : null;
+    return idx >= 0 ? idx : 0;
+  }, [exercisesFlat, exerciseIndex, setIndex, flatPlan]);
+  const currentItem = flatPlan[cursor] ?? null;
+  const currentExercise = currentItem?.exercise ?? null;
+  const currentSet = currentItem?.set ?? null;
+  const nextItem = cursor + 1 < flatPlan.length ? flatPlan[cursor + 1]! : null;
 
   // Form state for the current set ----------------------------------------
   const formKey = currentExercise && currentSet
@@ -245,6 +235,20 @@ function WorkoutInner({ program, session }: InnerProps) {
     [history, currentExercise?.id, weight, reps],
   );
 
+  // Advance to next item in the interleaved flatPlan, or finish the workout.
+  const advanceToNext = () => {
+    if (!nextItem) {
+      setPhase('done');
+      return;
+    }
+    const exIdxNext = exercisesFlat.findIndex((e) => e.id === nextItem.exercise.id);
+    if (exIdxNext < 0) {
+      setPhase('done');
+      return;
+    }
+    setExerciseSetIndex(exIdxNext, nextItem.setIndex);
+  };
+
   // Validate set ----------------------------------------------------------
   const validateSet = () => {
     if (!currentExercise || !currentSet) return;
@@ -273,19 +277,16 @@ function WorkoutInner({ program, session }: InnerProps) {
     };
     logSet(entry);
 
-    const isLastSet =
-      exerciseIndex + 1 >= totalExercises && setIndex + 1 >= currentExercise.sets.length;
-
-    if (isLastSet) {
-      // Skip rest, go straight to done.
-      advanceSet(currentExercise.sets.length, totalExercises);
+    if (!nextItem) {
+      // Final set — skip rest, mark workout done.
+      setPhase('done');
       return;
     }
 
     if (currentSet.rest_seconds > 0) {
       startRest();
     } else {
-      advanceSet(currentExercise.sets.length, totalExercises);
+      advanceToNext();
     }
   };
 
@@ -293,23 +294,28 @@ function WorkoutInner({ program, session }: InnerProps) {
     if (!currentExercise) return;
     const elapsed = endRest();
     updateLastSetRest(elapsed);
-    advanceSet(currentExercise.sets.length, totalExercises);
+    advanceToNext();
   };
 
   const skipSet = () => {
     if (!currentExercise) return;
     setMoreOpen(false);
-    advanceSet(currentExercise.sets.length, totalExercises);
+    advanceToNext();
   };
 
   const skipExercise = () => {
     if (!currentExercise) return;
     setMoreOpen(false);
-    if (exerciseIndex + 1 < totalExercises) {
-      setExerciseSetIndex(exerciseIndex + 1, 0);
-    } else {
-      advanceSet(currentExercise.sets.length, totalExercises);
+    const exId = currentExercise.id;
+    const next = flatPlan.findIndex((p, i) => i > cursor && p.exercise.id !== exId);
+    if (next === -1) {
+      setPhase('done');
+      return;
     }
+    const nxt = flatPlan[next]!;
+    const exIdxNext = exercisesFlat.findIndex((e) => e.id === nxt.exercise.id);
+    if (exIdxNext >= 0) setExerciseSetIndex(exIdxNext, nxt.setIndex);
+    else setPhase('done');
   };
 
   // Done phase — build a real SessionReport and POST.
@@ -397,14 +403,12 @@ function WorkoutInner({ program, session }: InnerProps) {
       notes: '',
     };
     logSet(entry);
-    const isLastSet =
-      exerciseIndex + 1 >= totalExercises && setIndex + 1 >= currentExercise.sets.length;
-    if (isLastSet) {
-      advanceSet(currentExercise.sets.length, totalExercises);
+    if (!nextItem) {
+      setPhase('done');
       return;
     }
     if (currentSet.rest_seconds > 0) startRest();
-    else advanceSet(currentExercise.sets.length, totalExercises);
+    else advanceToNext();
   };
 
   return (
@@ -470,6 +474,13 @@ function WorkoutInner({ program, session }: InnerProps) {
             <h2 className="t-title-2" style={{ margin: 0, color: 'var(--ink)', flex: 1 }}>
               {currentExercise.name}
             </h2>
+            {currentItem &&
+            (currentItem.blockType === 'superset' || currentItem.blockType === 'circuit') ? (
+              <Badge variant="accent">
+                {currentItem.blockType === 'superset' ? 'Superset' : 'Circuit'} · round{' '}
+                {currentItem.roundIndex + 1}
+              </Badge>
+            ) : null}
             {currentExercise.video_url ? (
               <IconButton ariaLabel="Vidéo de l'exercice" onClick={() => setVideoOpen(true)}>
                 <Video size={18} />
