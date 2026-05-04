@@ -12,6 +12,7 @@ import {
   NavBar,
   Sheet,
 } from '../components/ui/index.js';
+import { VideoFrame } from '../components/workout/VideoFrame.js';
 import { useProgram } from '../store/program.store.js';
 import { useWorkout } from '../store/workout.store.js';
 import { PreSessionCheckIn } from '../components/workout/PreSessionCheckIn.js';
@@ -191,20 +192,7 @@ export function SessionDetail() {
 function ExerciseSheetBody({ exercise }: { exercise: Exercise }) {
   return (
     <div style={{ display: 'grid', gap: 16, paddingBottom: 24 }}>
-      {exercise.video_url ? (
-        <div
-          style={{
-            aspectRatio: '16 / 9',
-            background: 'var(--bg-tinted)',
-            borderRadius: 14,
-            display: 'grid',
-            placeItems: 'center',
-            color: 'var(--ink-3)',
-          }}
-        >
-          <Play size={42} fill="currentColor" />
-        </div>
-      ) : null}
+      {exercise.video_url ? <VideoFrame url={exercise.video_url} title={exercise.name} /> : null}
 
       <div>
         <h2 className="t-title-2" style={{ margin: 0, color: 'var(--ink)' }}>

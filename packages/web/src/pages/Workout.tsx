@@ -31,6 +31,7 @@ import { SessionReport as SessionReportSchema } from '@coach/shared';
 import { RestTimer } from './RestTimer.js';
 import { PostSession } from './PostSession.js';
 import { TimedSetRunner } from '../components/workout/TimedSetRunner.js';
+import { VideoFrame } from '../components/workout/VideoFrame.js';
 import { useProgram } from '../store/program.store.js';
 import { useHistory } from '../store/history.store.js';
 import {
@@ -220,6 +221,7 @@ function WorkoutInner({ program, session }: InnerProps) {
   const [cuesOpen, setCuesOpen] = useState(false);
   const [moreOpen, setMoreOpen] = useState(false);
   const [closeOpen, setCloseOpen] = useState(false);
+  const [videoOpen, setVideoOpen] = useState(false);
 
   // Global timer derived from startedAt for accuracy across reloads.
   const [now, setNow] = useState(() => Date.now());
@@ -469,7 +471,7 @@ function WorkoutInner({ program, session }: InnerProps) {
               {currentExercise.name}
             </h2>
             {currentExercise.video_url ? (
-              <IconButton ariaLabel="Vidéo">
+              <IconButton ariaLabel="Vidéo de l'exercice" onClick={() => setVideoOpen(true)}>
                 <Video size={18} />
               </IconButton>
             ) : null}
@@ -681,6 +683,18 @@ function WorkoutInner({ program, session }: InnerProps) {
               />
             ))}
           </ListGroup>
+        ) : null}
+      </Sheet>
+
+      {/* Video sheet */}
+      <Sheet open={videoOpen} onClose={() => setVideoOpen(false)}>
+        {currentExercise.video_url ? (
+          <div style={{ display: 'grid', gap: 12, paddingBottom: 16 }}>
+            <h3 className="t-title-2" style={{ margin: 0 }}>
+              {currentExercise.name}
+            </h3>
+            <VideoFrame url={currentExercise.video_url} title={currentExercise.name} />
+          </div>
         ) : null}
       </Sheet>
 
